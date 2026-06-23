@@ -40,7 +40,19 @@ export default function App() {
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
   const [copied, setCopied] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const contentRef = useRef(null)
+
+  // Close sidebar menu on outside click.
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = () => setMenuOpen(false)
+    const timer = setTimeout(() => document.addEventListener('click', handler), 0)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('click', handler)
+    }
+  }, [menuOpen])
 
   // Load document + comments on mount.
   useEffect(() => {
@@ -162,7 +174,39 @@ export default function App() {
         </article>
 
         <aside className="rmd-sidebar">
-          <h2>Comments</h2>
+          <div className="rmd-sidebar-header">
+            <h2>Comments</h2>
+            {comments.length > 0 && (
+              <div className="rmd-sidebar-menu">
+                <button
+                  className="rmd-sidebar-menu-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMenuOpen(!menuOpen)
+                  }}
+                  title="More actions"
+                >
+                  ⋮
+                </button>
+                {menuOpen && (
+                  <div className="rmd-sidebar-menu-dropdown">
+                    <button
+                      className="rmd-sidebar-menu-item"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (confirm('Delete all comments? This cannot be undone.')) {
+                          persist([])
+                        }
+                        setMenuOpen(false)
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {comments.length === 0 && (
             <p className="rmd-hint">Select any text in the document to add a comment.</p>
           )}

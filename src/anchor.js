@@ -36,21 +36,34 @@ function buildTextIndex(container) {
 
 // Given a DOM selection inside the container, produce a text-quote anchor.
 export function selectionToAnchor(container, range) {
-  const { text } = buildTextIndex(container)
-  const quote = range.toString()
-  if (!quote.trim()) return null
+  const { text, map } = buildTextIndex(container)
 
-  // Find where the selected quote sits in the flat text by walking ranges.
-  const pre = document.createRange()
-  pre.setStart(container, 0)
-  pre.setEnd(range.startContainer, range.startOffset)
-  const start = pre.toString().length
-  const end = start + quote.length
+  // Find which characters in the filtered text index fall inside the DOM
+  // selection. This avoids range.toString() which would include text from
+  // Mermaid SVGs, KaTeX, and other non-prose rendered content.
+  //
+  // We use comparePoint on both edges of each character rather than
+  // isPointInRange, because the latter treats the range end as inclusive.
+  let startIdx = -1
+  let endIdx = -1
+  for (let i = 0; i < map.length; i++) {
+    const { node, offset } = map[i]
+    const before = range.comparePoint(node, offset)
+    const after = range.comparePoint(node, offset + 1)
+    if (before >= 0 && after <= 0) {
+      if (startIdx === -1) startIdx = i
+      endIdx = i
+    }
+  }
+
+  if (startIdx === -1) return null
+  const quote = text.slice(startIdx, endIdx + 1)
+  if (!quote.trim()) return null
 
   return {
     quote,
-    prefix: text.slice(Math.max(0, start - CONTEXT_LEN), start),
-    suffix: text.slice(end, end + CONTEXT_LEN),
+    prefix: text.slice(Math.max(0, startIdx - CONTEXT_LEN), startIdx),
+    suffix: text.slice(endIdx + 1, endIdx + 1 + CONTEXT_LEN),
   }
 }
 

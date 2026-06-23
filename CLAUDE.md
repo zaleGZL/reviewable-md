@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A local tool to review a single markdown file in the browser: render it, select text to leave inline comments, and copy those comments back to an AI as a structured prompt for the next revision. Comments persist to `<file>.review.json` next to the markdown so an AI can read them directly. Frontend is Vite + React; the backend is a zero-dependency Node server.
 
+## Language convention
+
+All UI text, comments, labels, and documentation in this project are in **English**. Do not use Chinese or other languages in user-facing strings or code comments.
+
 ## Commands
 
 ```bash

@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 
 const THEMES = [
-  { key: 'light', label: '亮色', icon: '☀️' },
-  { key: 'dark', label: '暗色', icon: '🌙' },
-  { key: 'system', label: '跟随系统', icon: '🖥️' },
+  { key: 'light', label: 'Light', icon: '☀️' },
+  { key: 'dark', label: 'Dark', icon: '🌙' },
+  { key: 'system', label: 'System', icon: '🖥️' },
 ]
-
-
 function getSystemDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
@@ -53,7 +51,7 @@ export default function ThemeToggle() {
           e.stopPropagation()
           setOpen(!open)
         }}
-        title="切换主题"
+        title="Switch theme"
       >
         {current.icon}
       </button>
