@@ -13,7 +13,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sync:agents": "node scripts/sync-agents.mjs"
   },
   "dependencies": {
     "katex": "^0.17.0",
