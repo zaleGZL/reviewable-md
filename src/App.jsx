@@ -1,9 +1,32 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeHighlight from 'rehype-highlight'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+import './hljs-theme.css'
 import { fetchDocument, fetchComments, saveComments } from './api'
 import { selectionToAnchor, highlightAnchors } from './anchor'
 import { buildAiPrompt } from './aiText'
+import Mermaid from './Mermaid.jsx'
+
+// Custom renderer for fenced code: ```mermaid becomes a diagram, everything
+// else falls through to react-markdown's default (with rehype-highlight applied).
+const mdComponents = {
+  code(props) {
+    const { className = '', children, ...rest } = props
+    const match = /language-mermaid/.test(className)
+    if (match) {
+      return <Mermaid code={String(children).replace(/\n$/, '')} />
+    }
+    return (
+      <code className={className} {...rest}>
+        {children}
+      </code>
+    )
+  },
+}
 
 function uid() {
   return 'c_' + Math.random().toString(36).slice(2, 10)
@@ -127,7 +150,13 @@ export default function App() {
           className="rmd-content"
           onMouseUp={onMouseUp}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.markdown}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeHighlight, rehypeKatex]}
+            components={mdComponents}
+          >
+            {doc.markdown}
+          </ReactMarkdown>
         </article>
 
         <aside className="rmd-sidebar">

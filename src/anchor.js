@@ -11,7 +11,16 @@ const CONTEXT_LEN = 32
 // index back to the DOM text node and offset, so we can turn a string range
 // into a DOM Range for highlighting.
 function buildTextIndex(container) {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  // Skip text inside rendered diagrams (Mermaid SVG) and math (KaTeX) — those
+  // are not part of the reviewable prose and would pollute anchor positions.
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      if (n.parentElement?.closest('.rmd-mermaid, svg, .katex')) {
+        return NodeFilter.FILTER_REJECT
+      }
+      return NodeFilter.FILTER_ACCEPT
+    },
+  })
   let text = ''
   const map = [] // map[i] = { node, offset } for text char i
   let node

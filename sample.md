@@ -31,6 +31,26 @@ The system has three components:
 - Should we support real-time data sources in the MVP, or defer to v2?
 - What is the pricing model — per seat, per widget, or usage based?
 
+## Data Flow
+
+```mermaid
+flowchart LR
+    U[User] -->|edits| E[Editor]
+    E -->|save| A[API]
+    A -->|store| D[(Database)]
+    P[Third-party page] -->|loads| R[Embed runtime]
+    R -->|fetch| A
+```
+
+## Capacity Model
+
+We estimate request load with $\lambda = N \cdot r$, where $N$ is the number of
+embedded widgets and $r$ the average refresh rate. Expected monthly cost:
+
+$$
+C = \sum_{i=1}^{n} \lambda_i \cdot c_i + C_{\text{fixed}}
+$$
+
 ## Timeline
 
 | Week | Milestone            |

@@ -107,6 +107,21 @@ body {
 }
 .rmd-content img { max-width: 100%; }
 
+.rmd-mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: 6px;
+  overflow: auto;
+}
+.rmd-mermaid svg { max-width: 100%; height: auto; }
+.rmd-mermaid-error {
+  border-left: 3px solid #cf222e;
+}
+.rmd-content .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+
 mark.rmd-highlight {
   background: var(--highlight);
   color: inherit;
