@@ -1,0 +1,26 @@
+{
+  "name": "reviewable-md",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Preview a markdown file, leave inline review comments, and copy them back to an AI for the next edit.",
+  "bin": {
+    "reviewable-md": "./server/cli.js"
+  },
+  "scripts": {
+    "dev": "RMD_DEV=1 node server/cli.js",
+    "dev:client": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}
