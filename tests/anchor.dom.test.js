@@ -105,6 +105,20 @@ describe('highlightAnchors', () => {
     expect(marks.p.closest('p')).toBeTruthy()
   })
 
+  it('skips a highlight whose range crosses element boundaries', () => {
+    // "quick brown" spans the <em> boundary, so surroundContents throws and
+    // the highlight is skipped — but other comments still apply and no error
+    // escapes.
+    container.innerHTML = '<p>the <em>quick</em> brown fox</p>'
+    const marks = highlightAnchors(container, [
+      { id: 'cross', anchor: { quote: 'quick brown' } },
+      { id: 'ok', anchor: { quote: 'fox' } },
+    ])
+    expect(marks.cross).toBeUndefined()
+    expect(marks.ok).toBeTruthy()
+    expect(marks.ok.textContent).toBe('fox')
+  })
+
   it('returns no element when the anchor text is gone', () => {
     container.innerHTML = '<p>the document changed entirely</p>'
     const marks = highlightAnchors(container, [

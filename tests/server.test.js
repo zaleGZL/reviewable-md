@@ -11,6 +11,20 @@ import {
   createHandler,
 } from '../server/lib.js'
 
+// Raw HTTP GET that preserves the literal request path. The global fetch()
+// normalizes "%2e%2e" away, so it cannot exercise the traversal guard.
+function rawGet(port, rawPath) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path: rawPath }, (res) => {
+      let body = ''
+      res.on('data', (c) => (body += c))
+      res.on('end', () => resolve({ status: res.statusCode, body }))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+
 describe('parseArgs', () => {
   it('defaults port to 5174 and open to true', () => {
     expect(parseArgs(['doc.md'])).toEqual({ port: 5174, open: true, file: 'doc.md' })
@@ -150,5 +164,105 @@ describe('createHandler API', () => {
     const res = await fetch(`${base}/some/spa/route`)
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('<title>app</title>')
+  })
+
+  it('serves an existing static asset with the right MIME type', async () => {
+    await fsp.mkdir(path.join(dir, 'assets'))
+    await fsp.writeFile(path.join(dir, 'assets', 'app.css'), 'body{color:red}')
+    const res = await fetch(`${base}/assets/app.css`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('text/css')
+    expect(await res.text()).toBe('body{color:red}')
+  })
+
+  it('serves "/" as index.html', async () => {
+    await fsp.writeFile(path.join(dir, 'index.html'), '<!doctype html>root')
+    const res = await fetch(`${base}/`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('text/html')
+    expect(await res.text()).toContain('root')
+  })
+
+  it('uses octet-stream for unknown extensions', async () => {
+    await fsp.writeFile(path.join(dir, 'data.bin'), 'x')
+    const res = await fetch(`${base}/data.bin`)
+    expect(res.headers.get('content-type')).toBe('application/octet-stream')
+  })
+
+  it('rejects path traversal with 403', async () => {
+    // Raw request: fetch() would normalize the encoded dots away.
+    const res = await rawGet(server.address().port, '/%2e%2e/%2e%2e/etc/passwd')
+    expect(res.status).toBe(403)
+    expect(res.body).toBe('Forbidden')
+  })
+
+  it('returns 500 JSON when the markdown file cannot be read', async () => {
+    await fsp.rm(mdPath) // remove the file the handler tries to read
+    const res = await fetch(`${base}/api/document`)
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/ENOENT|Error/)
+  })
+
+  it('returns 500 JSON when the PUT body is not valid JSON', async () => {
+    const res = await fetch(`${base}/api/comments`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'not json {{{',
+    })
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toBeTruthy()
+  })
+})
+
+describe('createHandler dev mode (proxy)', () => {
+  let upstream, upstreamPort, server, base
+
+  beforeEach(async () => {
+    // A fake "Vite" upstream the handler should proxy to.
+    upstream = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain' })
+      res.end('from upstream ' + req.url)
+    })
+    await new Promise((r) => upstream.listen(0, '127.0.0.1', r))
+    upstreamPort = upstream.address().port
+
+    const handler = createHandler({
+      mdPath: '/nonexistent.md',
+      reviewPath: '/nonexistent.review.json',
+      dev: true,
+      vitePort: upstreamPort,
+    })
+    server = http.createServer(handler)
+    await new Promise((r) => server.listen(0, '127.0.0.1', r))
+    base = `http://127.0.0.1:${server.address().port}`
+  })
+
+  afterEach(async () => {
+    server.closeAllConnections?.()
+    upstream.closeAllConnections?.()
+    await new Promise((r) => server.close(r))
+    // upstream may already be closed by the 502 test; close() errors if so.
+    await new Promise((r) => upstream.close(() => r()))
+  })
+
+  it('proxies non-API requests to the Vite upstream', async () => {
+    const res = await fetch(`${base}/src/main.jsx`)
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('from upstream /src/main.jsx')
+  })
+
+  it('still serves /api/* itself rather than proxying', async () => {
+    const res = await fetch(`${base}/api/comments`)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ comments: [] })
+  })
+
+  it('returns 502 when the upstream is unreachable', async () => {
+    // Close the upstream so the proxy connection fails.
+    upstream.closeAllConnections?.()
+    await new Promise((r) => upstream.close(r))
+    const res = await fetch(`${base}/whatever`)
+    expect(res.status).toBe(502)
+    expect(await res.text()).toBe('Vite not ready')
   })
 })

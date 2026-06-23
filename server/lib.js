@@ -64,10 +64,19 @@ const MIME = {
 }
 
 async function serveStatic(dist, req, res) {
-  let pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname)
+  // Decode the raw request path (strip query). We intentionally do NOT use
+  // new URL().pathname here: its getter folds "%2e%2e" into "..", which would
+  // hide traversal attempts and make the guard below unreachable.
+  const rawPath = req.url.split('?')[0]
+  let pathname
+  try {
+    pathname = decodeURIComponent(rawPath)
+  } catch {
+    pathname = rawPath
+  }
   if (pathname === '/') pathname = '/index.html'
-  const filePath = path.join(dist, pathname)
-  if (!filePath.startsWith(dist)) {
+  const filePath = path.normalize(path.join(dist, pathname))
+  if (filePath !== dist && !filePath.startsWith(dist + path.sep)) {
     res.writeHead(403)
     return res.end('Forbidden')
   }
@@ -76,15 +85,24 @@ async function serveStatic(dist, req, res) {
     res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' })
     res.end(data)
   } catch {
-    const html = await fsp.readFile(path.join(dist, 'index.html'))
-    res.writeHead(200, { 'Content-Type': 'text/html' })
-    res.end(html)
+    // SPA fallback to index.html; if that is missing too, 404 rather than
+    // letting the rejection escape unhandled.
+    try {
+      const html = await fsp.readFile(path.join(dist, 'index.html'))
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.end(html)
+    } catch {
+      res.writeHead(404, { 'Content-Type': 'text/plain' })
+      res.end('Not found')
+    }
   }
 }
 
 function proxyToVite(vitePort, req, res) {
   const proxy = http.request(
-    { hostname: 'localhost', port: vitePort, path: req.url, method: req.method, headers: req.headers },
+    // Use the IPv4 loopback explicitly: "localhost" may resolve to ::1 while
+    // the Vite dev server listens on 127.0.0.1, which would fail the proxy.
+    { hostname: '127.0.0.1', port: vitePort, path: req.url, method: req.method, headers: req.headers },
     (pr) => {
       res.writeHead(pr.statusCode, pr.headers)
       pr.pipe(res)
@@ -128,7 +146,7 @@ export function createHandler({ mdPath, reviewPath, dev = false, dist, vitePort 
       }
 
       if (dev) return proxyToVite(vitePort, req, res)
-      return serveStatic(dist, req, res)
+      return await serveStatic(dist, req, res)
     } catch (e) {
       sendJson(res, 500, { error: String(e) })
     }
