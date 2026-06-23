@@ -8,7 +8,7 @@
     "reviewable-md": "./server/cli.js"
   },
   "scripts": {
-    "dev": "RMD_DEV=1 node server/cli.js",
+    "dev": "RMD_DEV=1 node server/cli.js sample.md",
     "dev:client": "vite",
     "build": "vite build",
     "preview": "vite preview",

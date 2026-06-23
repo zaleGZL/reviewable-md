@@ -51,26 +51,39 @@ const handler = createHandler({
 
 const server = http.createServer(handler)
 
+const previewPort = DEV ? VITE_PORT : args.port
+const link = `http://localhost:${previewPort}`
+
+function openBrowser() {
+  if (!args.open) return
+  const opener = process.platform === 'darwin' ? 'open'
+    : process.platform === 'win32' ? 'start' : 'xdg-open'
+  spawn(opener, [link], { shell: true, stdio: 'ignore', detached: true }).unref()
+}
+
 let viteProc = null
 if (DEV) {
   viteProc = spawn('npx', ['vite', '--port', String(VITE_PORT), '--strictPort'], {
     cwd: ROOT,
-    stdio: 'inherit',
+    stdio: ['ignore', 'pipe', 'inherit'],
     shell: process.platform === 'win32',
+  })
+  let viteReady = false
+  viteProc.stdout.on('data', (chunk) => {
+    process.stdout.write(chunk)
+    if (!viteReady && /ready in/.test(chunk)) {
+      viteReady = true
+      openBrowser()
+    }
   })
   process.on('exit', () => viteProc?.kill())
   process.on('SIGINT', () => { viteProc?.kill(); process.exit(0) })
 }
 
 server.listen(args.port, '127.0.0.1', () => {
-  const link = `http://localhost:${args.port}`
   console.log(`\n  Reviewable Markdown`)
   console.log(`  file:     ${MD_PATH}`)
   console.log(`  comments: ${REVIEW_PATH}`)
   console.log(`  preview:  ${link}\n`)
-  if (args.open) {
-    const opener = process.platform === 'darwin' ? 'open'
-      : process.platform === 'win32' ? 'start' : 'xdg-open'
-    spawn(opener, [link], { shell: true, stdio: 'ignore', detached: true }).unref()
-  }
+  if (!DEV) openBrowser()
 })

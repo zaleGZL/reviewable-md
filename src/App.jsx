@@ -10,6 +10,7 @@ import { fetchDocument, fetchComments, saveComments } from './api'
 import { selectionToAnchor, highlightAnchors } from './anchor'
 import { buildAiPrompt } from './aiText'
 import Mermaid from './Mermaid.jsx'
+import ThemeToggle from './ThemeToggle.jsx'
 
 // Custom renderer for fenced code: ```mermaid becomes a diagram, everything
 // else falls through to react-markdown's default (with rehype-highlight applied).
@@ -138,6 +139,7 @@ export default function App() {
         <div className="rmd-title">📝 {doc.path}</div>
         <div className="rmd-actions">
           <span className="rmd-count">{open.length} open / {comments.length} total</span>
+          <ThemeToggle />
           <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
             {copied ? '✓ Copied' : 'Copy for AI'}
           </button>
