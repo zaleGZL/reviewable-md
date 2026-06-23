@@ -56,7 +56,7 @@ export function selectionToAnchor(container, range) {
 
 // Locate an anchor's character range in the current rendered text.
 // Returns { start, end } indices into the flat text, or null if not found.
-function locateAnchor(text, anchor) {
+export function locateAnchor(text, anchor) {
   const { quote, prefix = '', suffix = '' } = anchor
   if (!quote) return null
 
