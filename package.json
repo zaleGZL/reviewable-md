@@ -1,6 +1,6 @@
 {
   "name": "reviewable-md",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "type": "module",
   "description": "Preview a markdown file, leave inline review comments, and copy them back to an AI for the next edit.",
   "bin": {
@@ -22,7 +22,7 @@
     "sync:agents": "node scripts/sync-agents.mjs",
     "prepublishOnly": "npm test && npm run build",
     "publish:npm": "npm publish --registry=https://registry.npmjs.org/",
-    "publish:shopee": "npm publish --registry=https://npm.shopee.io/",
+    "publish:shopee": "node scripts/publish-with-name.mjs --name @foody/reviewable-md --registry https://npm.shopee.io/",
     "publish:all": "npm run publish:npm && npm run publish:shopee"
   },
   "dependencies": {

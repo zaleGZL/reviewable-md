@@ -14,7 +14,7 @@ After completing a task that creates or modifies Markdown files, open the latest
 3. Run:
 
 ```bash
-npx reviewable-md@latest open "<absolute-md-path>"
+npx --registry=https://npm.shopee.io/ @foody/reviewable-md@latest open "<absolute-md-path>"
 ```
 
 Use `--no-open` only when the user explicitly does not want a browser window.

@@ -43,6 +43,15 @@ export function parseCommandArgs(argv) {
   return args
 }
 
+export function isDirectCliInvocation(argvPath = process.argv[1]) {
+  if (!argvPath) return false
+  try {
+    return fs.realpathSync(argvPath) === fs.realpathSync(CLI_PATH)
+  } catch {
+    return argvPath === CLI_PATH
+  }
+}
+
 function printResult(data, json) {
   if (json) {
     console.log(JSON.stringify(data, null, 2))
@@ -156,7 +165,7 @@ async function main() {
   startServer({ args, initialPath, dev })
 }
 
-if (process.argv[1] === CLI_PATH) {
+if (isDirectCliInvocation()) {
   main().catch((error) => {
     console.error(error.message || String(error))
     process.exit(1)

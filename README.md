@@ -33,7 +33,7 @@ Use `npm run dev -- file.md` or **Open path** when you want the URL to contain
 Install the global Claude and Codex skill with:
 
 ```bash
-npx reviewable-md install-skill
+npx --registry=https://npm.shopee.io/ @foody/reviewable-md install-skill
 ```
 
 This writes the bundled skill to:
@@ -47,7 +47,7 @@ After that, compatible agents can open the latest generated or modified
 Markdown file with:
 
 ```bash
-npx reviewable-md@latest open "/absolute/path/to/file.md"
+npx --registry=https://npm.shopee.io/ @foody/reviewable-md@latest open "/absolute/path/to/file.md"
 ```
 
 The `open` command starts one local background daemon if needed, reuses it for
@@ -96,7 +96,9 @@ npm run preview                # serves the built client through server/cli.js
 ## Publish
 
 The package is designed to be published to both public npm and Shopee's
-internal npm registry with the same package name and version.
+internal npm registry with the same version. The public npm package name is
+`reviewable-md`; the Shopee npm package name is temporarily rewritten to
+`@foody/reviewable-md` during publishing and restored afterwards.
 
 ```bash
 npm run publish:npm            # https://registry.npmjs.org/
