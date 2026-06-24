@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A local tool to review a single markdown file in the browser: render it, select text to leave inline comments, and copy those comments back to an AI as a structured prompt for the next revision. Comments persist to `<file>.review.json` next to the markdown so an AI can read them directly. Frontend is Vite + React; the backend is a zero-dependency Node server.
+A pure frontend tool to review a markdown file in the browser: open a `.md` file through the browser picker or drag-and-drop, render it, select text to leave inline comments, and copy those comments back to an AI as a structured prompt for the next revision. The selected markdown content and comments persist in browser IndexedDB, keyed by file name.
 
 ## Language convention
 
@@ -13,9 +13,9 @@ All UI text, comments, labels, and documentation in this project are in **Englis
 ## Commands
 
 ```bash
-npm run dev -- <file.md>      # dev: Node server + Vite (HMR), opens browser at :27175
+npm run dev                   # dev: Vite (HMR), open http://localhost:27175
 npm run build                 # build client to dist/
-node server/cli.js <file.md>  # prod: serves built dist/ (no Vite); requires `npm run build` first
+npm run preview               # preview built client after npm run build
 npm test                      # run all tests once (vitest run)
 npm run test:watch            # vitest watch mode
 npx vitest run tests/App.test.jsx          # run a single test file
@@ -23,23 +23,16 @@ npx vitest run -t "writes the AI prompt"   # run tests matching a name
 npx vitest run --coverage                  # coverage report (text + html in coverage/)
 ```
 
-Note `npm run dev -- <file.md>` — the `--` is required so the file path reaches the CLI, not npm.
-
 ## Architecture
 
-### Dual-mode server (`server/cli.js` + `server/lib.js`)
+### Pure frontend file flow (`src/App.jsx` + `src/storage.js`)
 
-`cli.js` is only the entrypoint: arg parsing, file existence check, socket wiring, and (in dev) spawning Vite. All request/IO logic lives in `server/lib.js` (`createHandler`, `readComments`/`writeComments`, `parseArgs`, `serveStatic`) so it is unit-testable without a live socket. When changing server behavior, edit `lib.js` — keep `cli.js` thin.
+There is no backend server and no `/api` surface. `npm run dev` starts Vite directly. The app opens markdown files with browser File APIs, either from a file input or drag-and-drop. `src/storage.js` owns IndexedDB access:
 
-The handler runs in one of two modes, decided at startup:
-- **dev** (`RMD_DEV=1`, set by `npm run dev`, or when `dist/` is absent): spawns Vite on `port+1` and proxies all non-`/api` requests to it.
-- **prod** (`dist/` exists and `RMD_DEV` unset): serves the built client from `dist/` with an SPA fallback to `index.html`.
-
-Because `dist/` presence flips the mode, `npm run dev` forces dev via `RMD_DEV=1` so a stale `dist/` doesn't silently switch you to prod. The server always binds `127.0.0.1` (never `0.0.0.0`); the proxy targets `127.0.0.1` explicitly to avoid `localhost`→`::1` mismatches.
-
-API surface (everything else is static/proxied): `GET /api/document` → `{path, markdown}`, `GET /api/comments` → `{comments}`, `PUT /api/comments` writes the sidecar JSON.
-
-`vite.config.js` proxies `/api` → `:27174` only for the standalone `npm run dev:client` path; the normal `npm run dev` flow proxies the other direction (server → Vite).
+- Database: `reviewable-md`
+- Store: `documents`
+- Document key: markdown file name
+- Metadata key: `lastDocumentKey`
 
 ### Text-quote anchoring (`src/anchor.js`)
 
@@ -49,11 +42,9 @@ Comments do **not** store DOM offsets or source character positions — those br
 
 ### Rendering pipeline (`src/App.jsx`)
 
-`react-markdown` with `remark-gfm` + `remark-math` (remark) and `rehype-highlight` + `rehype-katex` (rehype). A custom `code` component intercepts ` ```mermaid ` blocks and routes them to `src/Mermaid.jsx`, which lazy-imports `mermaid` (so docs without diagrams keep a small bundle) and falls back to showing raw source on parse error. Comment state flows App → `saveComments` (persist) → re-render → `highlightAnchors`; "Copy for AI" builds the prompt via `src/aiText.js` (open comments only, each quoting its anchored text).
+`react-markdown` with `remark-gfm` + `remark-math` (remark) and `rehype-highlight` + `rehype-katex` (rehype). A custom `code` component intercepts ` ```mermaid ` blocks and routes them to `src/Mermaid.jsx`, which lazy-imports `mermaid` (so docs without diagrams keep a small bundle) and falls back to showing raw source on parse error. Comment state flows App → `saveComments` in `src/storage.js` (persist) → re-render → `highlightAnchors`; "Copy for AI" builds the prompt via `src/aiText.js` (open comments only, each quoting its anchored text).
 
 ## Testing notes
 
 - jsdom lacks `Range.getBoundingClientRect` and `matchMedia`; `tests/setup.js` stubs both and registers Testing Library `cleanup`. jsdom test files opt in with a `// @vitest-environment jsdom` comment on line 1 and `import './setup.js'`.
-- The traversal-guard test must use a raw `http.request` (not global `fetch`) because `fetch` normalizes `%2e%2e` away before it reaches the server.
-- Server tests call `server.closeAllConnections()` in teardown — without it, `fetch` keep-alive connections make `server.close()` hang ~5s per test.
-- `cli.js` (entry/socket wiring) is intentionally left uncovered.
+- `tests/storage.test.js` uses `fake-indexeddb` to exercise real IndexedDB request and transaction behavior in Node.

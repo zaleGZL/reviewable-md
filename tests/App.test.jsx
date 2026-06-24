@@ -1,22 +1,25 @@
 // @vitest-environment jsdom
 import './setup.js'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-// Mock the API client; App should call these and react to results.
-const fetchDocument = vi.fn()
-const fetchComments = vi.fn()
+const loadDocument = vi.fn()
+const loadLastDocument = vi.fn()
+const readMarkdownFile = vi.fn()
+const saveDocument = vi.fn()
 const saveComments = vi.fn()
-vi.mock('../src/api.js', () => ({
-  fetchDocument: (...a) => fetchDocument(...a),
-  fetchComments: (...a) => fetchComments(...a),
+vi.mock('../src/storage.js', () => ({
+  loadDocument: (...a) => loadDocument(...a),
+  loadLastDocument: (...a) => loadLastDocument(...a),
+  readMarkdownFile: (...a) => readMarkdownFile(...a),
+  saveDocument: (...a) => saveDocument(...a),
   saveComments: (...a) => saveComments(...a),
 }))
 
 import App from '../src/App.jsx'
 
-const DOC = { path: 'spec.md', markdown: 'The quick brown fox jumps.' }
+const DOC = { key: 'spec.md', path: 'spec.md', markdown: 'The quick brown fox jumps.', comments: [] }
 
 function comment(over = {}) {
   return {
@@ -52,23 +55,32 @@ function selectText(substring) {
 }
 
 beforeEach(() => {
-  fetchDocument.mockReset().mockResolvedValue(DOC)
-  fetchComments.mockReset().mockResolvedValue({ comments: [] })
+  loadDocument.mockReset().mockResolvedValue(null)
+  loadLastDocument.mockReset().mockResolvedValue(DOC)
+  readMarkdownFile.mockReset().mockResolvedValue(DOC)
+  saveDocument.mockReset().mockImplementation(async (doc, comments = []) => ({ ...doc, comments }))
   saveComments.mockReset().mockResolvedValue({ ok: true })
 })
 
 describe('App loading and error states', () => {
   it('shows a loading indicator before data arrives', async () => {
     let resolve
-    fetchDocument.mockReturnValue(new Promise((r) => (resolve = r)))
+    loadLastDocument.mockReturnValue(new Promise((r) => (resolve = r)))
     render(<App />)
     expect(screen.getByText(/Loading/)).toBeInTheDocument()
     resolve(DOC)
     await waitFor(() => expect(screen.queryByText(/Loading/)).toBeNull())
   })
 
-  it('shows an error when loading fails', async () => {
-    fetchDocument.mockRejectedValue(new Error('boom'))
+  it('shows the default picker when no document is restored', async () => {
+    loadLastDocument.mockResolvedValue(null)
+    render(<App />)
+    await screen.findByText('Open a markdown file')
+    expect(screen.getByText(/Drop a \.md file here/)).toBeInTheDocument()
+  })
+
+  it('shows an error on the picker when loading fails', async () => {
+    loadLastDocument.mockRejectedValue(new Error('boom'))
     render(<App />)
     await waitFor(() => expect(screen.getByText(/Error: boom/)).toBeInTheDocument())
   })
@@ -87,7 +99,7 @@ describe('App comment list', () => {
   })
 
   it('renders existing comments with their quote and body', async () => {
-    fetchComments.mockResolvedValue({ comments: [comment()] })
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
     const { container } = render(<App />)
     await screen.findByText('Clarify this.')
     // The quote appears both as a document highlight and in the comment card;
@@ -97,7 +109,8 @@ describe('App comment list', () => {
   })
 
   it('shows open/total counts', async () => {
-    fetchComments.mockResolvedValue({
+    loadLastDocument.mockResolvedValue({
+      ...DOC,
       comments: [comment({ id: 'a' }), comment({ id: 'b', resolved: true })],
     })
     render(<App />)
@@ -117,7 +130,8 @@ describe('App adding a comment', () => {
     await user.click(screen.getByRole('button', { name: 'Comment' }))
 
     await waitFor(() => expect(saveComments).toHaveBeenCalled())
-    const saved = saveComments.mock.calls.at(-1)[0]
+    expect(saveComments.mock.calls.at(-1)[0]).toBe('spec.md')
+    const saved = saveComments.mock.calls.at(-1)[1]
     expect(saved).toHaveLength(1)
     expect(saved[0].body).toBe('Please rephrase')
     expect(saved[0].anchor.quote).toBe('quick brown')
@@ -152,24 +166,24 @@ describe('App adding a comment', () => {
 describe('App resolve and delete', () => {
   it('resolves a comment', async () => {
     const user = userEvent.setup()
-    fetchComments.mockResolvedValue({ comments: [comment()] })
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
     render(<App />)
     await screen.findByText('Clarify this.')
 
     await user.click(screen.getByRole('button', { name: 'Resolve' }))
     await waitFor(() => expect(saveComments).toHaveBeenCalled())
-    expect(saveComments.mock.calls.at(-1)[0][0].resolved).toBe(true)
+    expect(saveComments.mock.calls.at(-1)[1][0].resolved).toBe(true)
   })
 
   it('deletes a comment', async () => {
     const user = userEvent.setup()
-    fetchComments.mockResolvedValue({ comments: [comment()] })
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
     render(<App />)
     await screen.findByText('Clarify this.')
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(saveComments).toHaveBeenCalled())
-    expect(saveComments.mock.calls.at(-1)[0]).toEqual([])
+    expect(saveComments.mock.calls.at(-1)[1]).toEqual([])
   })
 })
 
@@ -184,7 +198,7 @@ describe('App copy for AI', () => {
       configurable: true,
     })
 
-    fetchComments.mockResolvedValue({ comments: [comment()] })
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
     render(<App />)
     await screen.findByText('Clarify this.')
 
@@ -202,5 +216,54 @@ describe('App copy for AI', () => {
     render(<App />)
     await screen.findByText(/spec\.md/)
     expect(screen.getByRole('button', { name: /Copy for AI/ })).toBeDisabled()
+  })
+})
+
+describe('App file picker', () => {
+  it('loads a chosen markdown file and persists it to IndexedDB', async () => {
+    const user = userEvent.setup()
+    const nextDoc = { key: 'notes.md', path: 'notes.md', markdown: '# Notes', comments: [] }
+    loadLastDocument.mockResolvedValue(null)
+    readMarkdownFile.mockResolvedValue(nextDoc)
+
+    render(<App />)
+    await screen.findByText('Open a markdown file')
+
+    const file = new File(['# Notes'], 'notes.md', { type: 'text/markdown' })
+    await user.upload(screen.getByLabelText('Choose file'), file)
+
+    await screen.findByText(/notes\.md/)
+    expect(readMarkdownFile).toHaveBeenCalledWith(file)
+    expect(saveDocument).toHaveBeenCalledWith(nextDoc, [])
+  })
+
+  it('restores comments when reopening a file with the same name', async () => {
+    const user = userEvent.setup()
+    const nextDoc = { key: 'notes.md', path: 'notes.md', markdown: '# Notes v2', comments: [] }
+    const existing = { ...nextDoc, markdown: '# Notes v1', comments: [comment()] }
+    loadLastDocument.mockResolvedValue(null)
+    readMarkdownFile.mockResolvedValue(nextDoc)
+    loadDocument.mockResolvedValue(existing)
+
+    render(<App />)
+    await screen.findByText('Open a markdown file')
+
+    await user.upload(screen.getByLabelText('Choose file'), new File(['# Notes v2'], 'notes.md'))
+
+    await waitFor(() => expect(saveDocument).toHaveBeenCalledWith(nextDoc, existing.comments))
+  })
+
+  it('rejects non-markdown files', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue(null)
+
+    render(<App />)
+    await screen.findByText('Open a markdown file')
+    fireEvent.change(screen.getByLabelText('Choose file'), {
+      target: { files: [new File(['x'], 'notes.txt')] },
+    })
+
+    expect(await screen.findByText(/Please choose a markdown file/)).toBeInTheDocument()
+    expect(readMarkdownFile).not.toHaveBeenCalled()
   })
 })

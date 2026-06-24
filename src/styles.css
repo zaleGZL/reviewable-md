@@ -31,12 +31,93 @@ body {
   font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
 
-.rmd-loading, .rmd-error {
+.rmd-loading {
   padding: 40px;
   text-align: center;
   color: var(--muted);
 }
-.rmd-error { color: #cf222e; }
+
+.rmd-empty {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.rmd-picker {
+  min-height: calc(100vh - 53px);
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  border: 2px dashed transparent;
+}
+
+.rmd-picker-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.rmd-picker-panel {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  text-align: center;
+}
+
+.rmd-picker-panel h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.rmd-picker-panel p {
+  margin: 0 0 18px;
+  color: var(--muted);
+}
+
+.rmd-file-btn, .rmd-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rmd-file-btn {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  padding: 7px 16px;
+}
+
+.rmd-secondary-btn {
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.rmd-file-btn input, .rmd-secondary-btn input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rmd-error-text {
+  margin-top: 14px;
+  color: #cf222e;
+}
+
+.rmd-banner-error {
+  padding: 8px 20px;
+  color: #cf222e;
+  border-bottom: 1px solid var(--border);
+  background: var(--card-bg);
+}
 
 .rmd-header {
   position: sticky;

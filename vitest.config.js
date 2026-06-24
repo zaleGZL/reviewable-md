@@ -10,9 +10,8 @@ export default defineConfig({
     include: ['tests/**/*.test.{js,jsx}'],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.{js,jsx}', 'server/**/*.js'],
-      // main.jsx is the React mount entry (no logic); cli.js is the socket
-      // wiring exercised by smoke tests, not unit tests.
+      include: ['src/**/*.{js,jsx}'],
+      // main.jsx is the React mount entry and has no app logic.
       exclude: ['src/main.jsx'],
       reporter: ['text', 'html'],
     },

@@ -4,40 +4,42 @@ Preview a markdown file in the browser, leave **inline review comments** on any
 selected text, and **copy the comments back to an AI** so it can revise the
 document in the next iteration.
 
-Comments are persisted to a local JSON file (`<file>.review.json`) next to the
-markdown, so they survive reloads and an AI can read them directly.
+Comments are persisted in the browser's IndexedDB, keyed by markdown file name,
+so they survive reloads without a backend server.
 
 ## Quick start
 
 ```bash
 npm install
-npm run dev -- sample.md        # opens http://localhost:27175
+npm run dev                    # opens http://localhost:27175
 ```
 
 Then in the browser:
 
-1. **Select** any text in the rendered document.
-2. A comment box pops up — write your note and hit **⌘+Enter**.
-3. The comment is highlighted in the document and listed in the sidebar.
-4. Click **Copy for AI** to copy all open comments as a structured prompt.
-5. Paste it to your AI and let it revise the markdown. Reload to review again.
+1. **Drop** a `.md` file onto the page or click **Choose file**.
+2. **Select** any text in the rendered document.
+3. A comment box pops up — write your note and hit **⌘+Enter**.
+4. The comment is highlighted in the document and listed in the sidebar.
+5. Click **Copy for AI** to copy all open comments as a structured prompt.
+6. Paste it to your AI and let it revise the markdown. Reload to review again.
 
 ## How it works
 
 - **Frontend** — Vite + React. Renders markdown with `react-markdown` + GFM.
   Selections are anchored using a *text-quote selector* (quote + surrounding
   context), so highlights survive markdown re-rendering.
-- **Server** — a zero-dependency Node server (`server/cli.js`) that serves the
-  markdown, reads/writes the comments JSON, and proxies Vite in dev / serves
-  the built client in production.
+- **Storage** — the selected markdown content and review comments are stored in
+  IndexedDB. Reopening a file with the same name restores its existing comments.
 
-## Comment file format
+## Stored document format
 
-`<file>.review.json`:
+IndexedDB records are stored in the `reviewable-md` database:
 
 ```json
 {
-  "file": "sample.md",
+  "key": "sample.md",
+  "path": "sample.md",
+  "markdown": "# Project Proposal",
   "updatedAt": "2026-06-23T11:01:22.348Z",
   "comments": [
     {
@@ -51,20 +53,13 @@ Then in the browser:
 }
 ```
 
-## CLI
-
-```
-reviewable-md <file.md> [--port 27174] [--no-open]
-```
-
 ## Build
 
 ```bash
 npm run build                  # outputs dist/
-node server/cli.js sample.md   # serves the built client (no Vite)
+npm run preview                # serves the built client
 ```
 
 ## Status
 
-Working app. Next step: package as a Claude Code / Codex skill (`SKILL.md`)
-that launches this server on a markdown file and hands the user a preview URL.
+Working pure frontend app.

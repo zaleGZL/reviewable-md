@@ -6,7 +6,7 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import './hljs-theme.css'
-import { fetchDocument, fetchComments, saveComments } from './api'
+import { loadDocument, loadLastDocument, readMarkdownFile, saveDocument, saveComments } from './storage'
 import { selectionToAnchor, highlightAnchors } from './anchor'
 import { buildAiPrompt } from './aiText'
 import Mermaid from './Mermaid.jsx'
@@ -37,6 +37,8 @@ export default function App() {
   const [doc, setDoc] = useState(null)
   const [comments, setComments] = useState([])
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [dragActive, setDragActive] = useState(false)
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
   const [copied, setCopied] = useState(false)
@@ -54,21 +56,56 @@ export default function App() {
     }
   }, [menuOpen])
 
-  // Load document + comments on mount.
+  // Restore the most recent document from IndexedDB on mount.
   useEffect(() => {
-    Promise.all([fetchDocument(), fetchComments()])
-      .then(([d, c]) => {
-        setDoc(d)
-        setComments(c.comments || [])
+    loadLastDocument()
+      .then((saved) => {
+        if (saved) {
+          setDoc(saved)
+          setComments(saved.comments || [])
+        }
       })
       .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   // Persist comments whenever they change (after initial load).
   const persist = useCallback((next) => {
+    if (!doc) return
     setComments(next)
-    saveComments(next).catch((e) => setError(e.message))
-  }, [])
+    saveComments(doc.key, next).catch((e) => setError(e.message))
+  }, [doc])
+
+  async function openFile(file) {
+    if (!file) return
+    if (!/\.md$/i.test(file.name)) {
+      setError('Please choose a markdown file with a .md extension.')
+      return
+    }
+    try {
+      const nextDoc = await readMarkdownFile(file)
+      const existing = await loadDocument(nextDoc.key)
+      const saved = await saveDocument(nextDoc, existing?.comments || [])
+      setDoc(saved)
+      setComments(saved.comments || [])
+      setError(null)
+      setDraft(null)
+      setDraftText('')
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  function onChooseFile(e) {
+    openFile(e.target.files?.[0])
+    e.target.value = ''
+  }
+
+  function onDrop(e) {
+    e.preventDefault()
+    setDragActive(false)
+    openFile(e.dataTransfer.files?.[0])
+  }
 
   // Re-highlight after render and whenever comments change.
   useEffect(() => {
@@ -140,8 +177,41 @@ export default function App() {
     setTimeout(() => setCopied(false), 1500)
   }
 
-  if (error) return <div className="rmd-error">Error: {error}</div>
-  if (!doc) return <div className="rmd-loading">Loading…</div>
+  if (loading) return <div className="rmd-loading">Loading...</div>
+
+  if (!doc) {
+    return (
+      <div className="rmd-empty">
+        <header className="rmd-header">
+          <div className="rmd-title">Reviewable Markdown</div>
+          <ThemeToggle />
+        </header>
+        <main
+          className={'rmd-picker' + (dragActive ? ' rmd-picker-active' : '')}
+          onDragEnter={(e) => {
+            e.preventDefault()
+            setDragActive(true)
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDragLeave={(e) => {
+            e.preventDefault()
+            setDragActive(false)
+          }}
+          onDrop={onDrop}
+        >
+          <div className="rmd-picker-panel">
+            <h1>Open a markdown file</h1>
+            <p>Drop a .md file here or choose one from your computer.</p>
+            <label className="rmd-file-btn">
+              Choose file
+              <input type="file" accept=".md,text/markdown,text/plain" onChange={onChooseFile} />
+            </label>
+            {error && <p className="rmd-error-text">Error: {error}</p>}
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   const open = comments.filter((c) => !c.resolved)
 
@@ -151,12 +221,17 @@ export default function App() {
         <div className="rmd-title">📝 {doc.path}</div>
         <div className="rmd-actions">
           <span className="rmd-count">{open.length} open / {comments.length} total</span>
+          <label className="rmd-secondary-btn">
+            Open file
+            <input type="file" accept=".md,text/markdown,text/plain" onChange={onChooseFile} />
+          </label>
           <ThemeToggle />
           <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
             {copied ? '✓ Copied' : 'Copy for AI'}
           </button>
         </div>
       </header>
+      {error && <div className="rmd-banner-error">Error: {error}</div>}
 
       <main className="rmd-main">
         <article
