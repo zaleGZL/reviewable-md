@@ -28,6 +28,31 @@ Then in the browser:
 Use `npm run dev -- file.md` or **Open path** when you want the URL to contain
 `?path=...` and refresh from the latest disk content.
 
+## Agent Skill install
+
+Install the global Claude and Codex skill with:
+
+```bash
+npx reviewable-md install-skill
+```
+
+This writes the bundled skill to:
+
+```text
+~/.claude/skills/reviewable-md
+~/.codex/skills/reviewable-md
+```
+
+After that, compatible agents can open the latest generated or modified
+Markdown file with:
+
+```bash
+npx reviewable-md@latest open "/absolute/path/to/file.md"
+```
+
+The `open` command starts one local background daemon if needed, reuses it for
+future files, and opens the browser at a disk-backed `?path=...` URL.
+
 ## How it works
 
 - **Frontend** — Vite + React. Renders markdown with `react-markdown` + GFM.
@@ -67,6 +92,20 @@ IndexedDB records are stored in the `reviewable-md` database:
 npm run build                  # outputs dist/
 npm run preview                # serves the built client through server/cli.js
 ```
+
+## Publish
+
+The package is designed to be published to both public npm and Shopee's
+internal npm registry with the same package name and version.
+
+```bash
+npm run publish:npm            # https://registry.npmjs.org/
+npm run publish:shopee         # https://npm.shopee.io/
+npm run publish:all            # public npm, then Shopee npm
+```
+
+Authentication is handled by the local npm login or `.npmrc`; no tokens are
+stored in this repository.
 
 ## Status
 

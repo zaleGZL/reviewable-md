@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reviewable Markdown"
+  short_description: "Open generated Markdown files for review."
+  default_prompt: "Use $reviewable-md to open the latest generated Markdown file for review."

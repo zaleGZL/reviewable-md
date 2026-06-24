@@ -106,6 +106,15 @@ export function createHandler({ dev = false, dist, vitePort }) {
     try {
       const url = new URL(req.url, 'http://x')
 
+      if (url.pathname === '/api/health') {
+        if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' })
+        return sendJson(res, 200, {
+          ok: true,
+          name: 'reviewable-md',
+          pid: process.pid,
+        })
+      }
+
       if (url.pathname === '/api/document') {
         if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' })
         return sendJson(res, 200, await readMarkdownDocument(url.searchParams.get('path')))

@@ -97,6 +97,20 @@ describe('createHandler', () => {
     }
   })
 
+  it('serves /api/health for daemon probes', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/health`)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({
+        ok: true,
+        name: 'reviewable-md',
+      })
+    } finally {
+      await close(server)
+    }
+  })
+
   it('returns 404 JSON for unknown API routes', async () => {
     const { server, port } = await listen(createHandler({ dist }))
     try {
