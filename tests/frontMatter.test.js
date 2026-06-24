@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { stripFrontMatter } from '../src/frontMatter.js'
+import { frontMatterRange, stripFrontMatter } from '../src/frontMatter.js'
 
 describe('stripFrontMatter', () => {
   it('removes YAML front matter at the top of a markdown file', () => {
     expect(stripFrontMatter('---\nname: test\ndescription: hidden\n---\n# Title\n')).toBe('# Title\n')
+  })
+
+  it('reports the source range for top-level YAML front matter', () => {
+    const markdown = '---\nname: test\n---\n# Title\n'
+    expect(frontMatterRange(markdown)).toEqual({ start: 0, end: 19 })
   })
 
   it('supports CRLF line endings', () => {

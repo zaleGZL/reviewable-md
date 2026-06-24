@@ -4,7 +4,7 @@
 // markdown *source* text it refers to (not the rendered HTML text), so the AI
 // can locate and edit the right spot in the source markdown.
 
-import { stripFrontMatter } from './frontMatter'
+import { frontMatterRange, stripFrontMatter } from './frontMatter'
 
 // Build a normalized version of the markdown by stripping inline and block
 // formatting markers, keeping a position map back to the original source.
@@ -70,7 +70,7 @@ function buildSourceMap(md) {
 }
 
 // Find the original markdown source text corresponding to a rendered-text quote.
-function findMarkdownQuote(md, anchor) {
+function findMarkdownQuoteMatch(md, anchor) {
   const quote = anchor.quote
   // Match against a normalized version with formatting stripped.
   const { norm, pos } = buildSourceMap(md)
@@ -136,28 +136,87 @@ function findMarkdownQuote(md, anchor) {
         sectionEnd = md.length
       }
 
-      return md.slice(sectionStart, sectionEnd)
+      return {
+        quote: md.slice(sectionStart, sectionEnd),
+        start: sectionStart,
+        end: sectionEnd,
+      }
     }
 
     // Otherwise, return just the matched text with formatting markers.
-    return md.slice(start, end)
+    return {
+      quote: md.slice(start, end),
+      start,
+      end,
+    }
   }
 
   // Fallback: return the rendered quote as-is.
-  return quote
+  return {
+    quote,
+    start: Number.POSITIVE_INFINITY,
+    end: Number.POSITIVE_INFINITY,
+  }
+}
+
+function countLinesBefore(text, index) {
+  if (!Number.isFinite(index)) return null
+  return text.slice(0, index).split('\n').length
+}
+
+function lineInfoFor(originalMarkdown, strippedMatch, strippedOffset) {
+  if (!Number.isFinite(strippedMatch.start)) {
+    return {
+      lineStart: null,
+      lineEnd: null,
+      context: {
+        previousLine: null,
+        currentLine: null,
+        nextLine: null,
+      },
+    }
+  }
+
+  const start = strippedOffset + strippedMatch.start
+  const end = strippedOffset + strippedMatch.end
+  const lines = originalMarkdown.split(/\r?\n/)
+  const lineStart = countLinesBefore(originalMarkdown, start)
+  const lineEnd = countLinesBefore(originalMarkdown, Math.max(start, end - 1))
+  const lineIndex = lineStart - 1
+
+  return {
+    lineStart,
+    lineEnd,
+    context: {
+      previousLine: lines[lineIndex - 1] ?? null,
+      currentLine: lines[lineIndex] ?? null,
+      nextLine: lines[lineIndex + 1] ?? null,
+    },
+  }
 }
 
 export function buildAiPrompt(doc, comments) {
   const open = comments.filter((c) => !c.resolved)
+  const frontMatter = frontMatterRange(doc.markdown)
+  const strippedOffset = frontMatter?.end || 0
   const markdown = stripFrontMatter(doc.markdown)
+  const enriched = open
+    .map((c) => {
+      const match = findMarkdownQuoteMatch(markdown, c.anchor)
+      return {
+        sortIndex: match.start,
+        quote: match.quote,
+        body: c.body,
+        ...lineInfoFor(doc.markdown, match, strippedOffset),
+      }
+    })
+    .sort((a, b) => a.sortIndex - b.sortIndex)
+    .map(({ sortIndex, ...comment }) => comment)
 
   const payload = {
     file: doc.path,
-    instruction: 'Please revise the markdown file based on the following review comments. Each comment quotes the exact markdown source text it refers to. Apply the requested changes while keeping the rest of the document intact.',
-    comments: open.map((c) => ({
-      quote: findMarkdownQuote(markdown, c.anchor),
-      body: c.body,
-    })),
+    instruction: 'Please revise this markdown file using the review comments below. Comments are ordered by their position in the source file, and each comment includes the quoted source text, source line range, and nearby source lines for context. Apply each requested change only to the referenced location and keep unrelated content intact.',
+    comments: enriched,
   }
 
   return JSON.stringify(payload, null, 2)

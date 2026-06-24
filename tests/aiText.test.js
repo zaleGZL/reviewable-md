@@ -31,6 +31,22 @@ describe('buildAiPrompt', () => {
     expect(parsed.comments[0].body).toBe('Define what a widget is.')
   })
 
+  it('includes source line numbers and surrounding source lines', () => {
+    const doc2 = {
+      path: 'spec.md',
+      markdown: '# Spec\n\nBefore line\nTarget line with widget platform.\nAfter line',
+    }
+    const parsed = JSON.parse(buildAiPrompt(doc2, [comment()]))
+
+    expect(parsed.comments[0].lineStart).toBe(4)
+    expect(parsed.comments[0].lineEnd).toBe(4)
+    expect(parsed.comments[0].context).toEqual({
+      previousLine: 'Before line',
+      currentLine: 'Target line with widget platform.',
+      nextLine: 'After line',
+    })
+  })
+
   it('ignores top-level front matter when locating quoted markdown', () => {
     const doc2 = {
       path: 'skill.md',
@@ -48,6 +64,9 @@ describe('buildAiPrompt', () => {
 
     expect(parsed.comments[0].quote).toBe('Review this text')
     expect(parsed.comments[0].quote).not.toContain('name: hidden')
+    expect(parsed.comments[0].lineStart).toBe(7)
+    expect(parsed.comments[0].context.previousLine).toBe('')
+    expect(parsed.comments[0].context.currentLine).toBe('Review this text.')
   })
 
   it('extracts markdown source for formatted text', () => {
@@ -66,11 +85,24 @@ describe('buildAiPrompt', () => {
     expect(parsed.comments[0].quote).toBe('[the docs](https://example.com)')
   })
 
-  it('includes multiple comments in array order', () => {
-    const parsed = JSON.parse(buildAiPrompt(doc, [
-      comment({ id: 'a', body: 'first' }),
-      comment({ id: 'b', body: 'second' }),
+  it('sorts multiple comments by source document order', () => {
+    const doc2 = {
+      path: 'spec.md',
+      markdown: '# Spec\n\nFirst target.\n\nSecond target.',
+    }
+    const parsed = JSON.parse(buildAiPrompt(doc2, [
+      comment({
+        id: 'b',
+        body: 'second',
+        anchor: { quote: 'Second target' },
+      }),
+      comment({
+        id: 'a',
+        body: 'first',
+        anchor: { quote: 'First target' },
+      }),
     ]))
+
     expect(parsed.comments).toHaveLength(2)
     expect(parsed.comments[0].body).toBe('first')
     expect(parsed.comments[1].body).toBe('second')
