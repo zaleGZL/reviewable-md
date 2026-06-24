@@ -10,8 +10,18 @@ latest markdown content from disk while keeping the existing comments.
 
 ## Quick start
 
+### Inside Shopee (公司内)
+
 ```bash
-npm install
+npm install --registry=https://npm.shopee.io/ @foody/reviewable-md
+npm run dev                    # opens the default page at http://localhost:27175
+npm run dev -- sample.md       # opens sample.md and persists its path in the URL
+```
+
+### Outside Shopee (外网)
+
+```bash
+npm install reviewable-md
 npm run dev                    # opens the default page at http://localhost:27175
 npm run dev -- sample.md       # opens sample.md and persists its path in the URL
 ```
@@ -30,17 +40,12 @@ Use `npm run dev -- file.md` or **Open path** when you want the URL to contain
 
 ## Agent Skill install
 
+### Inside Shopee (公司内)
+
 Install the global Claude and Codex skill with:
 
 ```bash
 npx --registry=https://npm.shopee.io/ @foody/reviewable-md install-skill
-```
-
-This writes the bundled skill to:
-
-```text
-~/.claude/skills/reviewable-md
-~/.codex/skills/reviewable-md
 ```
 
 After that, compatible agents can open the latest generated or modified
@@ -48,6 +53,28 @@ Markdown file with:
 
 ```bash
 npx --registry=https://npm.shopee.io/ @foody/reviewable-md@latest open "/absolute/path/to/file.md"
+```
+
+### Outside Shopee (外网)
+
+Install the global Claude and Codex skill with:
+
+```bash
+npx reviewable-md install-skill
+```
+
+After that, compatible agents can open the latest generated or modified
+Markdown file with:
+
+```bash
+npx reviewable-md@latest open "/absolute/path/to/file.md"
+```
+
+This writes the bundled skill to:
+
+```text
+~/.claude/skills/reviewable-md
+~/.codex/skills/reviewable-md
 ```
 
 The `open` command starts one local background daemon if needed, reuses it for
