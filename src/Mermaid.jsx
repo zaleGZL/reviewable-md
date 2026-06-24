@@ -48,5 +48,5 @@ export default function Mermaid({ code }) {
       </pre>
     )
   }
-  return <div className="rmd-mermaid" ref={ref} />
+  return <div className="rmd-mermaid" data-mermaid-source={code} ref={ref} />
 }

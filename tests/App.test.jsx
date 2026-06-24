@@ -301,6 +301,30 @@ describe('App copy for AI', () => {
   })
 })
 
+describe('App copy to Confluence', () => {
+  it('writes Confluence Source Editor markup to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    loadLastDocument.mockResolvedValue({ ...DOC, markdown: '# Title\n\nBody' })
+    render(<App />)
+    await screen.findByText('Title')
+
+    fireEvent.click(screen.getByRole('button', { name: /Copy Confluence Source/ }))
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toContain('<h1>Title</h1>')
+    expect(writeText.mock.calls[0][0]).toContain('<p>Body</p>')
+
+    if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard)
+    else delete navigator.clipboard
+  })
+})
+
 describe('App path picker', () => {
   it('opens a server path from the default picker and persists it in the URL', async () => {
     const user = userEvent.setup()

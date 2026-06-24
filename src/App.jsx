@@ -15,6 +15,7 @@ import {
 } from './storage'
 import { selectionToAnchor, highlightAnchors } from './anchor'
 import { buildAiPrompt } from './aiText'
+import { copyConfluenceSource } from './confluenceCopy'
 import { stripFrontMatter } from './frontMatter'
 import Mermaid from './Mermaid.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
@@ -53,6 +54,7 @@ export default function App() {
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copiedConfluence, setCopiedConfluence] = useState(false)
   const contentRef = useRef(null)
 
   // Restore from the URL first so refreshes re-read the latest disk content.
@@ -194,6 +196,17 @@ export default function App() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  async function copyToConfluence() {
+    try {
+      await copyConfluenceSource(contentRef.current)
+      setCopiedConfluence(true)
+      setError(null)
+      setTimeout(() => setCopiedConfluence(false), 1500)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   if (loading) return <div className="rmd-loading">Loading...</div>
 
   if (!doc) {
@@ -242,6 +255,9 @@ export default function App() {
             aria-label="Clear all comments"
           >
             🧹
+          </button>
+          <button className="rmd-secondary-btn" onClick={copyToConfluence}>
+            {copiedConfluence ? '✓ Copied' : 'Copy Confluence Source'}
           </button>
           <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
             {copied ? '✓ Copied' : 'Copy for AI'}
