@@ -1,0 +1,137 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import http from 'node:http'
+import fsp from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import {
+  DEFAULT_PORT,
+  createHandler,
+  parseArgs,
+  readMarkdownDocument,
+} from '../server/lib.js'
+
+function listen(handler) {
+  return new Promise((resolve) => {
+    const server = http.createServer(handler)
+    server.listen(0, '127.0.0.1', () => {
+      resolve({ server, port: server.address().port })
+    })
+  })
+}
+
+async function close(server) {
+  server.closeAllConnections?.()
+  await new Promise((resolve) => server.close(resolve))
+}
+
+describe('parseArgs', () => {
+  it('defaults to no initial file', () => {
+    expect(parseArgs([])).toEqual({ port: DEFAULT_PORT, open: true, file: null })
+  })
+
+  it('parses a file, port, and --no-open', () => {
+    expect(parseArgs(['doc.md', '--port', '9000', '--no-open'])).toEqual({
+      port: 9000,
+      open: false,
+      file: 'doc.md',
+    })
+  })
+})
+
+describe('readMarkdownDocument', () => {
+  let dir
+
+  beforeEach(async () => {
+    dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rmd-server-'))
+  })
+
+  afterEach(async () => {
+    await fsp.rm(dir, { recursive: true, force: true })
+  })
+
+  it('reads the latest markdown content from disk', async () => {
+    const mdPath = path.join(dir, 'doc.md')
+    await fsp.writeFile(mdPath, '# First\n')
+    expect((await readMarkdownDocument(mdPath)).markdown).toBe('# First\n')
+
+    await fsp.writeFile(mdPath, '# Second\n')
+    expect((await readMarkdownDocument(mdPath)).markdown).toBe('# Second\n')
+  })
+
+  it('rejects non-markdown files', async () => {
+    await expect(readMarkdownDocument(path.join(dir, 'doc.txt'))).rejects.toMatchObject({
+      status: 400,
+    })
+  })
+})
+
+describe('createHandler', () => {
+  let dir, mdPath, dist
+
+  beforeEach(async () => {
+    dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rmd-handler-'))
+    mdPath = path.join(dir, 'doc.md')
+    dist = path.join(dir, 'dist')
+    await fsp.mkdir(dist)
+    await fsp.writeFile(mdPath, '# Doc\n')
+    await fsp.writeFile(path.join(dist, 'index.html'), '<div id="root"></div>')
+  })
+
+  afterEach(async () => {
+    await fsp.rm(dir, { recursive: true, force: true })
+  })
+
+  it('serves /api/document from disk', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/document?path=${encodeURIComponent(mdPath)}`)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({
+        key: mdPath,
+        path: mdPath,
+        name: 'doc.md',
+        markdown: '# Doc\n',
+      })
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('returns 404 JSON for unknown API routes', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/missing`)
+      expect(res.status).toBe(404)
+      expect(await res.json()).toEqual({ error: 'Not found' })
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('serves the SPA fallback for non-API routes', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/anything`)
+      expect(res.status).toBe(200)
+      expect(await res.text()).toBe('<div id="root"></div>')
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('proxies non-API requests in dev mode', async () => {
+    const vite = await listen((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(`proxied:${req.url}`)
+    })
+    const app = await listen(createHandler({ dev: true, vitePort: vite.port }))
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${app.port}/ui`)
+      expect(await res.text()).toBe('proxied:/ui')
+    } finally {
+      await close(app.server)
+      await close(vite.server)
+    }
+  })
+})

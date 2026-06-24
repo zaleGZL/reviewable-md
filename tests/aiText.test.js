@@ -31,6 +31,25 @@ describe('buildAiPrompt', () => {
     expect(parsed.comments[0].body).toBe('Define what a widget is.')
   })
 
+  it('ignores top-level front matter when locating quoted markdown', () => {
+    const doc2 = {
+      path: 'skill.md',
+      markdown: '---\nname: hidden\ndescription: hidden\n---\n# Skill\n\nReview this text.',
+    }
+    const parsed = JSON.parse(buildAiPrompt(doc2, [
+      comment({
+        anchor: {
+          quote: 'Review this text',
+          prefix: '',
+          suffix: '',
+        },
+      }),
+    ]))
+
+    expect(parsed.comments[0].quote).toBe('Review this text')
+    expect(parsed.comments[0].quote).not.toContain('name: hidden')
+  })
+
   it('extracts markdown source for formatted text', () => {
     const doc2 = { path: 'test.md', markdown: 'This is **bold text** here.' }
     const parsed = JSON.parse(buildAiPrompt(doc2, [

@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "description": "Preview a markdown file, leave inline review comments, and copy them back to an AI for the next edit.",
+  "bin": {
+    "reviewable-md": "./server/cli.js"
+  },
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 27175",
+    "dev": "RMD_DEV=1 node server/cli.js",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "node server/cli.js --no-open",
     "test": "vitest run",
     "test:watch": "vitest",
     "sync:agents": "node scripts/sync-agents.mjs"

@@ -42,19 +42,30 @@ function runStore(mode, callback) {
   }))
 }
 
-export function documentKeyForFile(file) {
-  return file.name
+export function documentKeyForPath(filePath) {
+  return filePath
 }
 
-export async function readMarkdownFile(file) {
+export async function fetchServerDocument(filePath) {
+  const res = await fetch(`/api/document?path=${encodeURIComponent(filePath)}`)
+  if (!res.ok) {
+    let message = `Failed to load document: ${res.status}`
+    try {
+      const body = await res.json()
+      if (body.error) message = body.error
+    } catch {
+      // Keep the status-based message when the response is not JSON.
+    }
+    throw new Error(message)
+  }
+  const doc = await res.json()
   return {
-    key: documentKeyForFile(file),
-    path: file.name,
-    markdown: await file.text(),
+    key: documentKeyForPath(doc.path),
+    path: doc.path,
+    markdown: doc.markdown,
     fileMeta: {
-      name: file.name,
-      size: file.size,
-      lastModified: file.lastModified,
+      name: doc.name,
+      source: 'server',
     },
   }
 }

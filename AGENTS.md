@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A pure frontend tool to review a markdown file in the browser: open a `.md` file through the browser picker or drag-and-drop, render it, select text to leave inline comments, and copy those comments back to an AI as a structured prompt for the next revision. The selected markdown content and comments persist in browser IndexedDB, keyed by file name.
+A local markdown review tool: open a `.md` file through a full local file path, render it, select text to leave inline comments, and copy those comments back to an AI as a structured prompt for the next revision. Opened files persist their absolute path in the URL so refreshes re-read the latest disk content. Comments persist in browser IndexedDB.
 
 ## Language convention
 
@@ -13,9 +13,10 @@ All UI text, comments, labels, and documentation in this project are in **Englis
 ## Commands
 
 ```bash
-npm run dev                   # dev: Vite (HMR), open http://localhost:27175
+npm run dev                   # dev: Node server + Vite (HMR), default page at :27175
+npm run dev -- <file.md>      # dev: open file and persist its absolute path in URL
 npm run build                 # build client to dist/
-npm run preview               # preview built client after npm run build
+npm run preview               # preview built client through server/cli.js
 npm test                      # run all tests once (vitest run)
 npm run test:watch            # vitest watch mode
 npx vitest run tests/App.test.jsx          # run a single test file
@@ -25,13 +26,19 @@ npx vitest run --coverage                  # coverage report (text + html in cov
 
 ## Architecture
 
-### Pure frontend file flow (`src/App.jsx` + `src/storage.js`)
+### Local server and file flow (`server/cli.js` + `server/lib.js` + `src/storage.js`)
 
-There is no backend server and no `/api` surface. `npm run dev` starts Vite directly. The app opens markdown files with browser File APIs, either from a file input or drag-and-drop. `src/storage.js` owns IndexedDB access:
+`server/cli.js` is the local entrypoint. It can start without a file and show the default picker, or with `<file.md>` and open `/?path=<absolute path>`. In dev it spawns Vite on `port + 1` and proxies non-API requests to Vite. In preview/prod it serves `dist/`.
+
+API surface: `GET /api/document?path=<absolute md path>` reads the latest file contents from disk and returns `{key, path, name, markdown}`. The server no longer reads or writes comments.
+
+The app intentionally does not support browser drag-and-drop or file inputs. Browser file APIs cannot expose absolute local file paths, so all document opens go through `npm run dev -- <file.md>`, a URL `?path=...`, or the UI's **Open path** control.
+
+`src/storage.js` owns IndexedDB access:
 
 - Database: `reviewable-md`
 - Store: `documents`
-- Document key: markdown file name
+- Document key: absolute file path
 - Metadata key: `lastDocumentKey`
 
 ### Text-quote anchoring (`src/anchor.js`)
@@ -48,3 +55,4 @@ Comments do **not** store DOM offsets or source character positions — those br
 
 - jsdom lacks `Range.getBoundingClientRect` and `matchMedia`; `tests/setup.js` stubs both and registers Testing Library `cleanup`. jsdom test files opt in with a `// @vitest-environment jsdom` comment on line 1 and `import './setup.js'`.
 - `tests/storage.test.js` uses `fake-indexeddb` to exercise real IndexedDB request and transaction behavior in Node.
+- `tests/server.test.js` covers the local disk-read API, static fallback, and dev proxy behavior.

@@ -50,11 +50,6 @@ body {
   border: 2px dashed transparent;
 }
 
-.rmd-picker-active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
 .rmd-picker-panel {
   width: min(520px, 100%);
   padding: 28px;
@@ -75,7 +70,34 @@ body {
   color: var(--muted);
 }
 
-.rmd-file-btn, .rmd-secondary-btn {
+.rmd-path-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.rmd-path-form input, .rmd-path-bar input {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.rmd-path-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.rmd-secondary-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -85,26 +107,11 @@ body {
   font-weight: 500;
 }
 
-.rmd-file-btn {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border: none;
-  padding: 7px 16px;
-}
-
 .rmd-secondary-btn {
   color: var(--fg);
   border: 1px solid var(--border);
   padding: 5px 10px;
   white-space: nowrap;
-}
-
-.rmd-file-btn input, .rmd-secondary-btn input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .rmd-error-text {
@@ -326,6 +333,7 @@ mark.rmd-highlight.rmd-resolved { background: var(--highlight-resolved); }
 @media (max-width: 800px) {
   .rmd-main { grid-template-columns: 1fr; }
   .rmd-sidebar { position: static; max-height: none; }
+  .rmd-path-form, .rmd-path-bar { grid-template-columns: 1fr; }
 }
 
 .rmd-theme-toggle { position: relative; }

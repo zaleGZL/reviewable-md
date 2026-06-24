@@ -6,9 +6,16 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import './hljs-theme.css'
-import { loadDocument, loadLastDocument, readMarkdownFile, saveDocument, saveComments } from './storage'
+import {
+  fetchServerDocument,
+  loadDocument,
+  loadLastDocument,
+  saveDocument,
+  saveComments,
+} from './storage'
 import { selectionToAnchor, highlightAnchors } from './anchor'
 import { buildAiPrompt } from './aiText'
+import { stripFrontMatter } from './frontMatter'
 import Mermaid from './Mermaid.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 
@@ -33,12 +40,16 @@ function uid() {
   return 'c_' + Math.random().toString(36).slice(2, 10)
 }
 
+function displayNameForPath(filePath) {
+  return filePath.split(/[\\/]/).filter(Boolean).pop() || filePath
+}
+
 export default function App() {
   const [doc, setDoc] = useState(null)
   const [comments, setComments] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dragActive, setDragActive] = useState(false)
+  const [pathText, setPathText] = useState(() => new URLSearchParams(window.location.search).get('path') || '')
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
   const [copied, setCopied] = useState(false)
@@ -56,16 +67,30 @@ export default function App() {
     }
   }, [menuOpen])
 
-  // Restore the most recent document from IndexedDB on mount.
+  // Restore from the URL first so refreshes re-read the latest disk content.
   useEffect(() => {
-    loadLastDocument()
-      .then((saved) => {
-        if (saved) {
-          setDoc(saved)
-          setComments(saved.comments || [])
-        }
+    async function restore() {
+      const filePath = new URLSearchParams(window.location.search).get('path')
+      if (filePath) {
+        const freshDoc = await fetchServerDocument(filePath)
+        const existing = await loadDocument(freshDoc.key)
+        const saved = await saveDocument(freshDoc, existing?.comments || [])
+        setDoc(saved)
+        setComments(saved.comments || [])
+        return
+      }
+
+      const saved = await loadLastDocument()
+      if (saved) {
+        setDoc(saved)
+        setComments(saved.comments || [])
+      }
+    }
+
+    restore()
+      .catch((e) => {
+        setError(e.message)
       })
-      .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
@@ -76,16 +101,20 @@ export default function App() {
     saveComments(doc.key, next).catch((e) => setError(e.message))
   }, [doc])
 
-  async function openFile(file) {
-    if (!file) return
-    if (!/\.md$/i.test(file.name)) {
-      setError('Please choose a markdown file with a .md extension.')
+  async function openServerPath(filePath) {
+    const trimmed = filePath.trim()
+    if (!trimmed) {
+      setError('Please enter an absolute markdown file path.')
       return
     }
     try {
-      const nextDoc = await readMarkdownFile(file)
-      const existing = await loadDocument(nextDoc.key)
-      const saved = await saveDocument(nextDoc, existing?.comments || [])
+      const freshDoc = await fetchServerDocument(trimmed)
+      const existing = await loadDocument(freshDoc.key)
+      const saved = await saveDocument(freshDoc, existing?.comments || [])
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.set('path', freshDoc.path)
+      window.history.replaceState(null, '', nextUrl)
+      setPathText(freshDoc.path)
       setDoc(saved)
       setComments(saved.comments || [])
       setError(null)
@@ -96,15 +125,9 @@ export default function App() {
     }
   }
 
-  function onChooseFile(e) {
-    openFile(e.target.files?.[0])
-    e.target.value = ''
-  }
-
-  function onDrop(e) {
+  function onOpenPath(e) {
     e.preventDefault()
-    setDragActive(false)
-    openFile(e.dataTransfer.files?.[0])
+    openServerPath(pathText)
   }
 
   // Re-highlight after render and whenever comments change.
@@ -186,26 +209,19 @@ export default function App() {
           <div className="rmd-title">Reviewable Markdown</div>
           <ThemeToggle />
         </header>
-        <main
-          className={'rmd-picker' + (dragActive ? ' rmd-picker-active' : '')}
-          onDragEnter={(e) => {
-            e.preventDefault()
-            setDragActive(true)
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          onDragLeave={(e) => {
-            e.preventDefault()
-            setDragActive(false)
-          }}
-          onDrop={onDrop}
-        >
+        <main className="rmd-picker">
           <div className="rmd-picker-panel">
             <h1>Open a markdown file</h1>
-            <p>Drop a .md file here or choose one from your computer.</p>
-            <label className="rmd-file-btn">
-              Choose file
-              <input type="file" accept=".md,text/markdown,text/plain" onChange={onChooseFile} />
-            </label>
+            <p>Enter the full path to a local .md file.</p>
+            <form className="rmd-path-form" onSubmit={onOpenPath}>
+              <input
+                aria-label="Markdown file path"
+                value={pathText}
+                placeholder="/Users/me/project/spec.md"
+                onChange={(e) => setPathText(e.target.value)}
+              />
+              <button className="rmd-secondary-btn" type="submit">Open path</button>
+            </form>
             {error && <p className="rmd-error-text">Error: {error}</p>}
           </div>
         </main>
@@ -214,23 +230,30 @@ export default function App() {
   }
 
   const open = comments.filter((c) => !c.resolved)
+  const visibleMarkdown = stripFrontMatter(doc.markdown)
+  const displayName = doc.fileMeta?.name || displayNameForPath(doc.path)
 
   return (
     <div className="rmd-layout">
       <header className="rmd-header">
-        <div className="rmd-title">📝 {doc.path}</div>
+        <div className="rmd-title" title={doc.path}>📝 {displayName}</div>
         <div className="rmd-actions">
           <span className="rmd-count">{open.length} open / {comments.length} total</span>
-          <label className="rmd-secondary-btn">
-            Open file
-            <input type="file" accept=".md,text/markdown,text/plain" onChange={onChooseFile} />
-          </label>
           <ThemeToggle />
           <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
             {copied ? '✓ Copied' : 'Copy for AI'}
           </button>
         </div>
       </header>
+      <form className="rmd-path-bar" onSubmit={onOpenPath}>
+        <input
+          aria-label="Markdown file path"
+          value={pathText}
+          placeholder="/Users/me/project/spec.md"
+          onChange={(e) => setPathText(e.target.value)}
+        />
+        <button className="rmd-secondary-btn" type="submit">Open path</button>
+      </form>
       {error && <div className="rmd-banner-error">Error: {error}</div>}
 
       <main className="rmd-main">
@@ -244,7 +267,7 @@ export default function App() {
             rehypePlugins={[rehypeHighlight, rehypeKatex]}
             components={mdComponents}
           >
-            {doc.markdown}
+            {visibleMarkdown}
           </ReactMarkdown>
         </article>
 

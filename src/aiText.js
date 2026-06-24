@@ -4,6 +4,8 @@
 // markdown *source* text it refers to (not the rendered HTML text), so the AI
 // can locate and edit the right spot in the source markdown.
 
+import { stripFrontMatter } from './frontMatter'
+
 // Build a normalized version of the markdown by stripping inline and block
 // formatting markers, keeping a position map back to the original source.
 // This lets us find a rendered-text quote inside the original markdown even
@@ -147,12 +149,13 @@ function findMarkdownQuote(md, anchor) {
 
 export function buildAiPrompt(doc, comments) {
   const open = comments.filter((c) => !c.resolved)
+  const markdown = stripFrontMatter(doc.markdown)
 
   const payload = {
     file: doc.path,
     instruction: 'Please revise the markdown file based on the following review comments. Each comment quotes the exact markdown source text it refers to. Apply the requested changes while keeping the rest of the document intact.',
     comments: open.map((c) => ({
-      quote: findMarkdownQuote(doc.markdown, c.anchor),
+      quote: findMarkdownQuote(markdown, c.anchor),
       body: c.body,
     })),
   }

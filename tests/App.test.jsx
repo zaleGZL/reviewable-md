@@ -6,13 +6,13 @@ import userEvent from '@testing-library/user-event'
 
 const loadDocument = vi.fn()
 const loadLastDocument = vi.fn()
-const readMarkdownFile = vi.fn()
+const fetchServerDocument = vi.fn()
 const saveDocument = vi.fn()
 const saveComments = vi.fn()
 vi.mock('../src/storage.js', () => ({
+  fetchServerDocument: (...a) => fetchServerDocument(...a),
   loadDocument: (...a) => loadDocument(...a),
   loadLastDocument: (...a) => loadLastDocument(...a),
-  readMarkdownFile: (...a) => readMarkdownFile(...a),
   saveDocument: (...a) => saveDocument(...a),
   saveComments: (...a) => saveComments(...a),
 }))
@@ -55,9 +55,10 @@ function selectText(substring) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/')
+  fetchServerDocument.mockReset().mockResolvedValue(DOC)
   loadDocument.mockReset().mockResolvedValue(null)
   loadLastDocument.mockReset().mockResolvedValue(DOC)
-  readMarkdownFile.mockReset().mockResolvedValue(DOC)
   saveDocument.mockReset().mockImplementation(async (doc, comments = []) => ({ ...doc, comments }))
   saveComments.mockReset().mockResolvedValue({ ok: true })
 })
@@ -76,7 +77,7 @@ describe('App loading and error states', () => {
     loadLastDocument.mockResolvedValue(null)
     render(<App />)
     await screen.findByText('Open a markdown file')
-    expect(screen.getByText(/Drop a \.md file here/)).toBeInTheDocument()
+    expect(screen.getByText(/Enter the full path/)).toBeInTheDocument()
   })
 
   it('shows an error on the picker when loading fails', async () => {
@@ -89,6 +90,57 @@ describe('App loading and error states', () => {
     render(<App />)
     await screen.findByText(/spec\.md/)
     expect(screen.getByText(/quick brown fox/)).toBeInTheDocument()
+  })
+
+  it('hides top-level front matter from the rendered document', async () => {
+    loadLastDocument.mockResolvedValue({
+      ...DOC,
+      markdown: '---\nname: hidden-skill\ndescription: hidden description\n---\n# Visible Title\n',
+    })
+
+    render(<App />)
+
+    await screen.findByText('Visible Title')
+    expect(screen.queryByText(/hidden-skill/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/hidden description/)).not.toBeInTheDocument()
+  })
+
+  it('loads a disk document from the URL path', async () => {
+    const diskDoc = {
+      key: '/tmp/spec.md',
+      path: '/tmp/spec.md',
+      markdown: 'Fresh disk content',
+      fileMeta: { name: 'spec.md' },
+      comments: [],
+    }
+    window.history.replaceState(null, '', '/?path=%2Ftmp%2Fspec.md')
+    fetchServerDocument.mockResolvedValue(diskDoc)
+
+    render(<App />)
+
+    await screen.findByText('Fresh disk content')
+    const title = screen.getByText(/spec\.md/)
+    expect(title).toHaveTextContent('spec.md')
+    expect(title).toHaveAttribute('title', '/tmp/spec.md')
+    expect(fetchServerDocument).toHaveBeenCalledWith('/tmp/spec.md')
+    expect(saveDocument).toHaveBeenCalledWith(diskDoc, [])
+  })
+
+  it('preserves comments for a disk document loaded from the URL path', async () => {
+    const diskDoc = {
+      key: '/tmp/spec.md',
+      path: '/tmp/spec.md',
+      markdown: 'Fresh disk content',
+      comments: [],
+    }
+    window.history.replaceState(null, '', '/?path=%2Ftmp%2Fspec.md')
+    fetchServerDocument.mockResolvedValue(diskDoc)
+    loadDocument.mockResolvedValue({ ...diskDoc, comments: [comment()] })
+
+    render(<App />)
+
+    await screen.findByText('Clarify this.')
+    expect(saveDocument).toHaveBeenCalledWith(diskDoc, [comment()])
   })
 })
 
@@ -219,51 +271,61 @@ describe('App copy for AI', () => {
   })
 })
 
-describe('App file picker', () => {
-  it('loads a chosen markdown file and persists it to IndexedDB', async () => {
+describe('App path picker', () => {
+  it('opens a server path from the default picker and persists it in the URL', async () => {
     const user = userEvent.setup()
-    const nextDoc = { key: 'notes.md', path: 'notes.md', markdown: '# Notes', comments: [] }
+    const diskDoc = {
+      key: '/tmp/notes.md',
+      path: '/tmp/notes.md',
+      markdown: '# Disk Notes',
+      comments: [],
+    }
     loadLastDocument.mockResolvedValue(null)
-    readMarkdownFile.mockResolvedValue(nextDoc)
+    fetchServerDocument.mockResolvedValue(diskDoc)
 
     render(<App />)
     await screen.findByText('Open a markdown file')
 
-    const file = new File(['# Notes'], 'notes.md', { type: 'text/markdown' })
-    await user.upload(screen.getByLabelText('Choose file'), file)
+    await user.type(screen.getByLabelText('Markdown file path'), '/tmp/notes.md')
+    await user.click(screen.getByRole('button', { name: 'Open path' }))
 
-    await screen.findByText(/notes\.md/)
-    expect(readMarkdownFile).toHaveBeenCalledWith(file)
-    expect(saveDocument).toHaveBeenCalledWith(nextDoc, [])
+    await screen.findByText('Disk Notes')
+    expect(fetchServerDocument).toHaveBeenCalledWith('/tmp/notes.md')
+    expect(window.location.search).toBe('?path=%2Ftmp%2Fnotes.md')
+    expect(saveDocument).toHaveBeenCalledWith(diskDoc, [])
   })
 
-  it('restores comments when reopening a file with the same name', async () => {
+  it('opens a server path from the document view and persists it in the URL', async () => {
     const user = userEvent.setup()
-    const nextDoc = { key: 'notes.md', path: 'notes.md', markdown: '# Notes v2', comments: [] }
-    const existing = { ...nextDoc, markdown: '# Notes v1', comments: [comment()] }
-    loadLastDocument.mockResolvedValue(null)
-    readMarkdownFile.mockResolvedValue(nextDoc)
-    loadDocument.mockResolvedValue(existing)
+    const diskDoc = {
+      key: '/tmp/other.md',
+      path: '/tmp/other.md',
+      markdown: '# Other',
+      comments: [],
+    }
+    fetchServerDocument.mockResolvedValue(diskDoc)
 
     render(<App />)
-    await screen.findByText('Open a markdown file')
+    await screen.findByText(/spec\.md/)
 
-    await user.upload(screen.getByLabelText('Choose file'), new File(['# Notes v2'], 'notes.md'))
+    const pathInput = screen.getByLabelText('Markdown file path')
+    await user.type(pathInput, '/tmp/other.md')
+    await user.click(screen.getByRole('button', { name: 'Open path' }))
 
-    await waitFor(() => expect(saveDocument).toHaveBeenCalledWith(nextDoc, existing.comments))
+    await screen.findByText('Other')
+    expect(fetchServerDocument).toHaveBeenCalledWith('/tmp/other.md')
+    expect(window.location.search).toBe('?path=%2Ftmp%2Fother.md')
   })
 
-  it('rejects non-markdown files', async () => {
+  it('requires a non-empty path', async () => {
     const user = userEvent.setup()
     loadLastDocument.mockResolvedValue(null)
 
     render(<App />)
     await screen.findByText('Open a markdown file')
-    fireEvent.change(screen.getByLabelText('Choose file'), {
-      target: { files: [new File(['x'], 'notes.txt')] },
-    })
+    await user.click(screen.getByRole('button', { name: 'Open path' }))
 
-    expect(await screen.findByText(/Please choose a markdown file/)).toBeInTheDocument()
-    expect(readMarkdownFile).not.toHaveBeenCalled()
+    expect(await screen.findByText(/Please enter an absolute markdown file path/)).toBeInTheDocument()
+    expect(fetchServerDocument).not.toHaveBeenCalled()
   })
 })

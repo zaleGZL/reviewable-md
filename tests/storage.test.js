@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  documentKeyForFile,
+  documentKeyForPath,
+  fetchServerDocument,
   loadDocument,
   loadLastDocument,
-  readMarkdownFile,
   saveComments,
   saveDocument,
 } from '../src/storage.js'
@@ -22,27 +22,51 @@ beforeEach(async () => {
   await deleteDb('reviewable-md')
 })
 
-describe('documentKeyForFile', () => {
-  it('uses the file name as the document key', () => {
-    expect(documentKeyForFile(new File(['# A'], 'a.md'))).toBe('a.md')
+describe('documentKeyForPath', () => {
+  it('uses the absolute file path as the document key', () => {
+    expect(documentKeyForPath('/tmp/a.md')).toBe('/tmp/a.md')
   })
 })
 
-describe('readMarkdownFile', () => {
-  it('reads markdown content and file metadata', async () => {
-    const file = new File(['# A'], 'a.md', { type: 'text/markdown', lastModified: 1000 })
-    const doc = await readMarkdownFile(file)
+describe('fetchServerDocument', () => {
+  it('loads a markdown document through the local server API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        key: '/tmp/a.md',
+        path: '/tmp/a.md',
+        name: 'a.md',
+        markdown: '# A',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
 
-    expect(doc).toMatchObject({
-      key: 'a.md',
-      path: 'a.md',
+    const doc = await fetchServerDocument('/tmp/a.md')
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/document?path=%2Ftmp%2Fa.md')
+    expect(doc).toEqual({
+      key: '/tmp/a.md',
+      path: '/tmp/a.md',
       markdown: '# A',
       fileMeta: {
         name: 'a.md',
-        size: 3,
-        lastModified: 1000,
+        source: 'server',
       },
     })
+
+    vi.unstubAllGlobals()
+  })
+
+  it('throws the server error message when the API fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: 'ENOENT' }),
+    }))
+
+    await expect(fetchServerDocument('/tmp/missing.md')).rejects.toThrow('ENOENT')
+
+    vi.unstubAllGlobals()
   })
 })
 
