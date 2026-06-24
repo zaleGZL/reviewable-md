@@ -2,7 +2,7 @@
 // Reviewable Markdown — local server entrypoint.
 //
 // Usage:
-//   reviewable-md <file.md> [--port 5174] [--no-open]
+//   reviewable-md <file.md> [--port 27174] [--no-open]
 //
 // Serves a single markdown file with a review UI. Comments are persisted to
 // `<file>.review.json` next to the markdown so an AI can read them directly.
@@ -17,7 +17,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import url from 'node:url'
 import { spawn } from 'node:child_process'
-import { parseArgs, reviewPathFor, createHandler } from './lib.js'
+import { DEFAULT_PORT, parseArgs, reviewPathFor, createHandler } from './lib.js'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
@@ -25,7 +25,7 @@ const DIST = path.join(ROOT, 'dist')
 
 const args = parseArgs(process.argv.slice(2))
 if (!args.file) {
-  console.error('Usage: reviewable-md <file.md> [--port 5174] [--no-open]')
+  console.error(`Usage: reviewable-md <file.md> [--port ${DEFAULT_PORT}] [--no-open]`)
   process.exit(1)
 }
 

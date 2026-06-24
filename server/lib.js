@@ -7,8 +7,10 @@ import http from 'node:http'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 
+export const DEFAULT_PORT = 27174
+
 export function parseArgs(argv) {
-  const args = { port: 5174, open: true, file: null }
+  const args = { port: DEFAULT_PORT, open: true, file: null }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--port') args.port = parseInt(argv[++i], 10)

@@ -11,7 +11,7 @@ markdown, so they survive reloads and an AI can read them directly.
 
 ```bash
 npm install
-npm run dev -- sample.md        # opens http://localhost:5174
+npm run dev -- sample.md        # opens http://localhost:27175
 ```
 
 Then in the browser:
@@ -54,7 +54,7 @@ Then in the browser:
 ## CLI
 
 ```
-reviewable-md <file.md> [--port 5174] [--no-open]
+reviewable-md <file.md> [--port 27174] [--no-open]
 ```
 
 ## Build

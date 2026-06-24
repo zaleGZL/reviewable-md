@@ -13,7 +13,7 @@ All UI text, comments, labels, and documentation in this project are in **Englis
 ## Commands
 
 ```bash
-npm run dev -- <file.md>      # dev: Node server + Vite (HMR), opens browser at :5174
+npm run dev -- <file.md>      # dev: Node server + Vite (HMR), opens browser at :27175
 npm run build                 # build client to dist/
 node server/cli.js <file.md>  # prod: serves built dist/ (no Vite); requires `npm run build` first
 npm test                      # run all tests once (vitest run)
@@ -39,7 +39,7 @@ Because `dist/` presence flips the mode, `npm run dev` forces dev via `RMD_DEV=1
 
 API surface (everything else is static/proxied): `GET /api/document` → `{path, markdown}`, `GET /api/comments` → `{comments}`, `PUT /api/comments` writes the sidecar JSON.
 
-`vite.config.js` proxies `/api` → `:5174` only for the standalone `npm run dev:client` path; the normal `npm run dev` flow proxies the other direction (server → Vite).
+`vite.config.js` proxies `/api` → `:27174` only for the standalone `npm run dev:client` path; the normal `npm run dev` flow proxies the other direction (server → Vite).
 
 ### Text-quote anchoring (`src/anchor.js`)
 

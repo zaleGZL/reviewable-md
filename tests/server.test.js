@@ -9,6 +9,7 @@ import {
   readComments,
   writeComments,
   createHandler,
+  DEFAULT_PORT,
 } from '../server/lib.js'
 
 // Raw HTTP GET that preserves the literal request path. The global fetch()
@@ -26,8 +27,8 @@ function rawGet(port, rawPath) {
 }
 
 describe('parseArgs', () => {
-  it('defaults port to 5174 and open to true', () => {
-    expect(parseArgs(['doc.md'])).toEqual({ port: 5174, open: true, file: 'doc.md' })
+  it('defaults port to DEFAULT_PORT and open to true', () => {
+    expect(parseArgs(['doc.md'])).toEqual({ port: DEFAULT_PORT, open: true, file: 'doc.md' })
   })
 
   it('parses --port', () => {
