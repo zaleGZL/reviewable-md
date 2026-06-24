@@ -53,19 +53,7 @@ export default function App() {
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
   const [copied, setCopied] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const contentRef = useRef(null)
-
-  // Close sidebar menu on outside click.
-  useEffect(() => {
-    if (!menuOpen) return
-    const handler = () => setMenuOpen(false)
-    const timer = setTimeout(() => document.addEventListener('click', handler), 0)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('click', handler)
-    }
-  }, [menuOpen])
 
   // Restore from the URL first so refreshes re-read the latest disk content.
   useEffect(() => {
@@ -193,6 +181,12 @@ export default function App() {
     persist(comments.map((c) => (c.id === id ? { ...c, resolved: !c.resolved } : c)))
   }
 
+  function clearComments() {
+    if (confirm('Delete all comments? This cannot be undone.')) {
+      persist([])
+    }
+  }
+
   async function copyForAi() {
     const text = buildAiPrompt(doc, comments)
     await navigator.clipboard.writeText(text)
@@ -240,6 +234,15 @@ export default function App() {
         <div className="rmd-actions">
           <span className="rmd-count">{open.length} open / {comments.length} total</span>
           <ThemeToggle />
+          <button
+            className="rmd-icon-btn"
+            onClick={clearComments}
+            disabled={!comments.length}
+            title="Clear all comments"
+            aria-label="Clear all comments"
+          >
+            🧹
+          </button>
           <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
             {copied ? '✓ Copied' : 'Copy for AI'}
           </button>
@@ -274,36 +277,6 @@ export default function App() {
         <aside className="rmd-sidebar">
           <div className="rmd-sidebar-header">
             <h2>Comments</h2>
-            {comments.length > 0 && (
-              <div className="rmd-sidebar-menu">
-                <button
-                  className="rmd-sidebar-menu-btn"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setMenuOpen(!menuOpen)
-                  }}
-                  title="More actions"
-                >
-                  ⋮
-                </button>
-                {menuOpen && (
-                  <div className="rmd-sidebar-menu-dropdown">
-                    <button
-                      className="rmd-sidebar-menu-item"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (confirm('Delete all comments? This cannot be undone.')) {
-                          persist([])
-                        }
-                        setMenuOpen(false)
-                      }}
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           {comments.length === 0 && (
             <p className="rmd-hint">Select any text in the document to add a comment.</p>

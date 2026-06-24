@@ -237,6 +237,35 @@ describe('App resolve and delete', () => {
     await waitFor(() => expect(saveComments).toHaveBeenCalled())
     expect(saveComments.mock.calls.at(-1)[1]).toEqual([])
   })
+
+  it('clears all comments from the header after confirmation', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Clear all comments' }))
+
+    expect(confirmSpy).toHaveBeenCalledWith('Delete all comments? This cannot be undone.')
+    await waitFor(() => expect(saveComments).toHaveBeenCalled())
+    expect(saveComments.mock.calls.at(-1)[1]).toEqual([])
+    confirmSpy.mockRestore()
+  })
+
+  it('does not clear comments when confirmation is cancelled', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Clear all comments' }))
+
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(saveComments).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
 })
 
 describe('App copy for AI', () => {
@@ -268,6 +297,7 @@ describe('App copy for AI', () => {
     render(<App />)
     await screen.findByText(/spec\.md/)
     expect(screen.getByRole('button', { name: /Copy for AI/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clear all comments' })).toBeDisabled()
   })
 })
 
