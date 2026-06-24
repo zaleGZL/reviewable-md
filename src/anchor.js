@@ -60,10 +60,30 @@ export function selectionToAnchor(container, range) {
   const quote = text.slice(startIdx, endIdx + 1)
   if (!quote.trim()) return null
 
+  // Detect if the selection spans filtered elements (Mermaid, KaTeX, etc.)
+  // by checking if the range contains nodes that were skipped by buildTextIndex.
+  let hasFilteredContent = false
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(n) {
+      if (n.closest('.rmd-mermaid, svg, .katex')) {
+        return NodeFilter.FILTER_ACCEPT
+      }
+      return NodeFilter.FILTER_SKIP
+    },
+  })
+  let elem
+  while ((elem = walker.nextNode())) {
+    if (range.intersectsNode(elem)) {
+      hasFilteredContent = true
+      break
+    }
+  }
+
   return {
     quote,
     prefix: text.slice(Math.max(0, startIdx - CONTEXT_LEN), startIdx),
     suffix: text.slice(endIdx + 1, endIdx + 1 + CONTEXT_LEN),
+    hasFilteredContent,
   }
 }
 

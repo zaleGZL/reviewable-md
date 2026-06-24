@@ -75,4 +75,25 @@ describe('buildAiPrompt', () => {
     const parsed = JSON.parse(buildAiPrompt(doc, []))
     expect(parsed.comments).toHaveLength(0)
   })
+
+  it('expands to full section when hasFilteredContent is true', () => {
+    const doc2 = {
+      path: 'test.md',
+      markdown: '## Data Flow\n\n```mermaid\nflowchart LR\n    A --> B\n```\n\n## Capacity Model',
+    }
+    const parsed = JSON.parse(buildAiPrompt(doc2, [
+      comment({
+        anchor: {
+          quote: 'Data Flow\n',
+          prefix: '',
+          suffix: '',
+          hasFilteredContent: true,
+        },
+      }),
+    ]))
+    expect(parsed.comments[0].quote).toContain('## Data Flow')
+    expect(parsed.comments[0].quote).toContain('```mermaid')
+    expect(parsed.comments[0].quote).toContain('flowchart LR')
+    expect(parsed.comments[0].quote).not.toContain('## Capacity Model')
+  })
 })

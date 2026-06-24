@@ -68,9 +68,9 @@ function buildSourceMap(md) {
 }
 
 // Find the original markdown source text corresponding to a rendered-text quote.
-function findMarkdownQuote(md, quote) {
-  // Match against a normalized version with formatting stripped, then expand
-  // to include the surrounding markdown formatting markers.
+function findMarkdownQuote(md, anchor) {
+  const quote = anchor.quote
+  // Match against a normalized version with formatting stripped.
   const { norm, pos } = buildSourceMap(md)
   const nIdx = norm.indexOf(quote)
   if (nIdx !== -1) {
@@ -106,6 +106,38 @@ function findMarkdownQuote(md, quote) {
       break
     }
 
+    // If the selection spans filtered content (Mermaid, KaTeX, code blocks),
+    // expand to include all markdown source between start and end positions.
+    // This captures code blocks, diagrams, and other content that was filtered
+    // from the rendered text but exists in the source.
+    if (anchor.hasFilteredContent) {
+      // When the selection spans filtered content (Mermaid diagrams, KaTeX,
+      // code blocks), the rendered quote only contains the visible prose text
+      // before/after the filtered element. To give the AI the complete context,
+      // expand the quote to the full markdown section between the nearest
+      // heading before the match and the next heading (or end of document).
+      let sectionStart = start
+      const before = md.slice(0, start)
+      const prevHeading = before.match(/\n#{1,6}\s+[^\n]*\n?$/)
+      if (prevHeading) {
+        sectionStart = before.lastIndexOf(prevHeading[0])
+      } else if (/^#{1,6}\s+/.test(md)) {
+        sectionStart = 0
+      }
+
+      let sectionEnd = end
+      const after = md.slice(end)
+      const nextHeading = after.match(/\n#{1,6}\s+/)
+      if (nextHeading) {
+        sectionEnd = end + after.indexOf(nextHeading[0])
+      } else {
+        sectionEnd = md.length
+      }
+
+      return md.slice(sectionStart, sectionEnd)
+    }
+
+    // Otherwise, return just the matched text with formatting markers.
     return md.slice(start, end)
   }
 
@@ -120,7 +152,7 @@ export function buildAiPrompt(doc, comments) {
     file: doc.path,
     instruction: 'Please revise the markdown file based on the following review comments. Each comment quotes the exact markdown source text it refers to. Apply the requested changes while keeping the rest of the document intact.',
     comments: open.map((c) => ({
-      quote: findMarkdownQuote(doc.markdown, c.anchor.quote),
+      quote: findMarkdownQuote(doc.markdown, c.anchor),
       body: c.body,
     })),
   }
