@@ -281,7 +281,7 @@ describe('App copy for AI', () => {
     render(<App />)
     await screen.findByText('Clarify this.')
 
-    fireEvent.click(screen.getByRole('button', { name: /Copy for AI/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Copy Prompt/ }))
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     const text = writeText.mock.calls[0][0]
     expect(text).toContain('spec.md')
@@ -294,7 +294,7 @@ describe('App copy for AI', () => {
   it('disables the copy button when there are no comments', async () => {
     render(<App />)
     await screen.findByText(/spec\.md/)
-    expect(screen.getByRole('button', { name: /Copy for AI/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Copy Prompt/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Clear all comments' })).toBeDisabled()
   })
 })
