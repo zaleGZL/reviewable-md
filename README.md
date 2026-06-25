@@ -4,39 +4,6 @@
 
 评论保存在浏览器本地，刷新页面不会丢失。打开文档后，刷新会重新读取磁盘上的最新内容，同时保留已有评论。
 
-## 快速开始
-
-### 公司内网（Shopee）
-
-```bash
-npm install --registry=https://npm.shopee.io/ @foody/reviewable-md
-npm run dev                    # 在 http://localhost:27175 打开默认页面
-npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
-```
-
-### 外网
-
-```bash
-npm install reviewable-md
-npm run dev                    # 在 http://localhost:27175 打开默认页面
-npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
-```
-
-在浏览器中：
-
-1. 输入本地 `.md` 文件的绝对路径，点击 **Open path**。
-2. 在渲染后的文档中**选中文字**，弹出评论框，写下备注后按 **⌘+Enter** 保存。
-3. 评论会在文档中高亮显示，并列在侧边栏。
-4. 点击 **Copy Prompt** 将所有未解决的评论复制为结构化 prompt，粘贴给 AI 修改文档，刷新后继续评审。
-
-### Copy Source
-
-**Copy Source** 支持将文档导出为不同格式：
-
-- **Markdown** — 去除 front matter 的原始 markdown，可粘贴到任何支持 markdown 的地方。
-- **Confluence** — 在 Confluence 编辑页面，点击右上角 **···** → **Open in Source Editor**，然后粘贴。
-- **Share Link** — 复制 `http://<局域网IP>:<端口>/?path=...`，局域网内的同事可以直接打开相同的文档。
-
 ## Agent Skill 安装
 
 ### 公司内网（Shopee）
@@ -71,5 +38,38 @@ skill 文件会写入：
 ```
 
 `open` 命令会在需要时启动一个本地后台 daemon，后续文件复用同一个 daemon，并在浏览器中打开对应的 `?path=...` URL。
+
+## 快速开始
+
+### 公司内网（Shopee）
+
+```bash
+npm install --registry=https://npm.shopee.io/ @foody/reviewable-md
+npm run dev                    # 在 http://localhost:27175 打开默认页面
+npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
+```
+
+### 外网
+
+```bash
+npm install reviewable-md
+npm run dev                    # 在 http://localhost:27175 打开默认页面
+npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
+```
+
+在浏览器中：
+
+1. 输入本地 `.md` 文件的绝对路径，点击 **Open path**。
+2. 在渲染后的文档中**选中文字**，弹出评论框，写下备注后按 **⌘+Enter** 保存。
+3. 评论会在文档中高亮显示，并列在侧边栏。
+4. 点击 **Copy Prompt** 将所有未解决的评论复制为结构化 prompt，粘贴给 AI 修改文档，刷新后继续评审。
+
+### Copy Source
+
+**Copy Source** 支持将文档导出为不同格式：
+
+- **Markdown** — 去除 front matter 的原始 markdown，可粘贴到任何支持 markdown 的地方。
+- **Confluence** — 在 Confluence 编辑页面，点击右上角 **···** → **Open in Source Editor**，然后粘贴。
+- **Share Link** — 复制 `http://<局域网IP>:<端口>/?path=...`，局域网内的同事可以直接打开相同的文档。
 
 英文文档见 [README.en.md](./README.en.md)。
