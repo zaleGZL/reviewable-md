@@ -4,9 +4,7 @@ Preview a markdown file in the browser, leave **inline review comments** on any
 selected text, and **copy the comments back to an AI** so it can revise the
 document in the next iteration.
 
-Comments are persisted in the browser's IndexedDB. When a document is opened
-through the local server path (`?path=/absolute/file.md`), refreshes re-read the
-latest markdown content from disk while keeping the existing comments.
+Comments are saved locally in the browser and survive page refreshes. When a document is open, refreshing re-reads the latest content from disk while keeping your comments.
 
 ## Quick start
 
