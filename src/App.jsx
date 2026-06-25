@@ -75,7 +75,15 @@ export default function App() {
   const [copied, setCopied] = useState(false)
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [copiedSource, setCopiedSource] = useState(null)
+  const [lanInfo, setLanInfo] = useState({ ips: [], port: null })
   const contentRef = useRef(null)
+
+  useEffect(() => {
+    fetch('/api/network-info')
+      .then((r) => r.ok ? r.json() : { ips: [], port: null })
+      .then((data) => setLanInfo({ ips: data.ips || [], port: data.port || null }))
+      .catch(() => {})
+  }, [])
 
   // Restore from the URL first so refreshes re-read the latest disk content.
   useEffect(() => {
@@ -230,6 +238,20 @@ export default function App() {
     }
   }
 
+  async function copyLanUrl() {
+    const ip = lanInfo.ips[0]
+    const port = lanInfo.port
+    if (!ip || !port || !doc) return
+    const lanUrl = `http://${ip}:${port}/?path=${encodeURIComponent(doc.path)}`
+    try {
+      await navigator.clipboard.writeText(lanUrl)
+      markSourceCopied('Share Link')
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   async function copyConfluenceSourceForEditor() {
     try {
       await copyConfluenceSource(contentRef.current)
@@ -338,11 +360,12 @@ export default function App() {
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onClick={copyMarkdownSource}>Markdown</DropdownMenuItem>
                 <DropdownMenuItem onClick={copyConfluenceSourceForEditor}>Confluence</DropdownMenuItem>
+                <DropdownMenuItem onClick={copyLanUrl} disabled={!lanInfo.ips.length}>Share Link</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button onClick={copyForAi} disabled={!comments.length}>
               {copied ? <Check aria-hidden="true" /> : <MessageSquareText aria-hidden="true" />}
-              {copied ? 'Copied' : 'Copy for AI'}
+              {copied ? 'Copied' : 'Copy Prompt'}
             </Button>
           </div>
         </header>

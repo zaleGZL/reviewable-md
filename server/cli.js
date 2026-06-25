@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import url from 'node:url'
 import { spawn } from 'node:child_process'
-import { DEFAULT_PORT, createHandler, parseArgs } from './lib.js'
+import { DEFAULT_PORT, createHandler, getLanIps, parseArgs } from './lib.js'
 import { openMarkdownFile } from './daemon.js'
 import { installSkill } from './installSkill.js'
 
@@ -95,6 +95,7 @@ function startServer({ args, initialPath = null, dev }) {
     dev,
     dist: DIST,
     vitePort,
+    port: args.port,
   }))
 
   let viteProc = null
@@ -117,9 +118,11 @@ function startServer({ args, initialPath = null, dev }) {
     process.on('SIGINT', () => { viteProc?.kill(); process.exit(0) })
   }
 
-  server.listen(args.port, '127.0.0.1', () => {
+  server.listen(args.port, '0.0.0.0', () => {
+    const lanIps = getLanIps()
     console.log(`\n  Reviewable Markdown`)
     console.log(`  server:  http://127.0.0.1:${args.port}`)
+    if (lanIps.length) console.log(`  network: http://${lanIps[0]}:${args.port}`)
     console.log(`  preview: ${link}`)
     if (initialPath) console.log(`  file:    ${initialPath}`)
     console.log('')

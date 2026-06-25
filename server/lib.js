@@ -1,8 +1,22 @@
 import http from 'node:http'
+import os from 'node:os'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 
 export const DEFAULT_PORT = 27174
+
+export function getLanIps() {
+  const ifaces = os.networkInterfaces()
+  const ips = []
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal && !iface.address.startsWith('169.254.')) {
+        ips.push(iface.address)
+      }
+    }
+  }
+  return ips
+}
 
 export function parseArgs(argv) {
   const args = { port: DEFAULT_PORT, open: true, file: null }
@@ -101,7 +115,7 @@ function proxyToVite(vitePort, req, res) {
   req.pipe(proxy)
 }
 
-export function createHandler({ dev = false, dist, vitePort }) {
+export function createHandler({ dev = false, dist, vitePort, port }) {
   return async (req, res) => {
     try {
       const url = new URL(req.url, 'http://x')
@@ -118,6 +132,11 @@ export function createHandler({ dev = false, dist, vitePort }) {
       if (url.pathname === '/api/document') {
         if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' })
         return sendJson(res, 200, await readMarkdownDocument(url.searchParams.get('path')))
+      }
+
+      if (url.pathname === '/api/network-info') {
+        if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' })
+        return sendJson(res, 200, { ips: getLanIps(), port: port || DEFAULT_PORT })
       }
 
       if (url.pathname.startsWith('/api/')) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import http from 'node:http'
 import fsp from 'node:fs/promises'
 import os from 'node:os'
@@ -6,6 +6,7 @@ import path from 'node:path'
 import {
   DEFAULT_PORT,
   createHandler,
+  getLanIps,
   parseArgs,
   readMarkdownDocument,
 } from '../server/lib.js'
@@ -23,6 +24,29 @@ async function close(server) {
   server.closeAllConnections?.()
   await new Promise((resolve) => server.close(resolve))
 }
+
+describe('getLanIps', () => {
+  it('excludes loopback, link-local, and IPv6 addresses', () => {
+    vi.spyOn(os, 'networkInterfaces').mockReturnValue({
+      lo: [{ family: 'IPv4', internal: true, address: '127.0.0.1' }],
+      eth0: [
+        { family: 'IPv4', internal: false, address: '192.168.1.100' },
+        { family: 'IPv6', internal: false, address: 'fe80::1' },
+      ],
+      eth1: [{ family: 'IPv4', internal: false, address: '169.254.0.1' }],
+    })
+    expect(getLanIps()).toEqual(['192.168.1.100'])
+    vi.restoreAllMocks()
+  })
+
+  it('returns empty array when no LAN interfaces exist', () => {
+    vi.spyOn(os, 'networkInterfaces').mockReturnValue({
+      lo: [{ family: 'IPv4', internal: true, address: '127.0.0.1' }],
+    })
+    expect(getLanIps()).toEqual([])
+    vi.restoreAllMocks()
+  })
+})
 
 describe('parseArgs', () => {
   it('defaults to no initial file', () => {
@@ -128,6 +152,19 @@ describe('createHandler', () => {
       const res = await fetch(`http://127.0.0.1:${port}/anything`)
       expect(res.status).toBe(200)
       expect(await res.text()).toBe('<div id="root"></div>')
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('returns network-info with ips array and port', async () => {
+    const { server, port } = await listen(createHandler({ dist, port: 9999 }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/network-info`)
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(Array.isArray(data.ips)).toBe(true)
+      expect(data.port).toBe(9999)
     } finally {
       await close(server)
     }
