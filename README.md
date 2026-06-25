@@ -28,15 +28,18 @@ npm run dev -- sample.md       # opens sample.md and persists its path in the UR
 
 Then in the browser:
 
-1. **Enter** the absolute path to a local `.md` file.
-2. **Select** any text in the rendered document.
-3. A comment box pops up — write your note and hit **⌘+Enter**.
-4. The comment is highlighted in the document and listed in the sidebar.
-5. Click **Copy for AI** to copy all open comments as a structured prompt.
-6. Paste it to your AI and let it revise the markdown. Reload to review again.
+1. **Enter** the absolute path to a local `.md` file and click **Open path**.
+2. **Select** any text in the rendered document to open a comment box — write your note and hit **⌘+Enter**.
+3. The comment is highlighted in the document and listed in the sidebar.
+4. Click **Copy Prompt** to copy all open comments as a structured prompt, then paste into your AI to revise the document. Reload to review again.
 
-Use `npm run dev -- file.md` or **Open path** when you want the URL to contain
-`?path=...` and refresh from the latest disk content.
+### Copy Source
+
+**Copy Source** exports the document in different formats:
+
+- **Markdown** — raw markdown with front matter stripped. Paste anywhere that accepts markdown.
+- **Confluence** — In Confluence editor, click **···** (top-right) → **Open in Source Editor**, then paste.
+- **Share Link** — copies `http://<LAN-IP>:<port>/?path=...` so teammates on the same network can open the same document directly.
 
 ## Agent Skill install
 
