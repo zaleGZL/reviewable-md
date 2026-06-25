@@ -1,144 +1,96 @@
 # Reviewable Markdown
 
-Preview a markdown file in the browser, leave **inline review comments** on any
-selected text, and **copy the comments back to an AI** so it can revise the
-document in the next iteration.
+在浏览器中预览 Markdown 文件，在任意选中文字上留**行内评审意见**，然后把意见**一键复制给 AI**，让它在下一轮迭代中修改文档。
 
-Comments are persisted in the browser's IndexedDB. When a document is opened
-through the local server path (`?path=/absolute/file.md`), refreshes re-read the
-latest markdown content from disk while keeping the existing comments.
+评论保存在浏览器 IndexedDB 中。通过本地服务器路径（`?path=/absolute/file.md`）打开文档后，刷新页面会重新读取磁盘上的最新内容，同时保留已有评论。
 
-## Quick start
+## 快速开始
 
-### Inside Shopee (公司内)
+### 公司内网（Shopee）
 
 ```bash
 npm install --registry=https://npm.shopee.io/ @foody/reviewable-md
-npm run dev                    # opens the default page at http://localhost:27175
-npm run dev -- sample.md       # opens sample.md and persists its path in the URL
+npm run dev                    # 在 http://localhost:27175 打开默认页面
+npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
 ```
 
-### Outside Shopee (外网)
+### 外网
 
 ```bash
 npm install reviewable-md
-npm run dev                    # opens the default page at http://localhost:27175
-npm run dev -- sample.md       # opens sample.md and persists its path in the URL
+npm run dev                    # 在 http://localhost:27175 打开默认页面
+npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
 ```
 
-Then in the browser:
+在浏览器中：
 
-1. **Enter** the absolute path to a local `.md` file and click **Open path**.
-2. **Select** any text in the rendered document to open a comment box — write your note and hit **⌘+Enter**.
-3. The comment is highlighted in the document and listed in the sidebar.
-4. Click **Copy Prompt** to copy all open comments as a structured prompt, then paste into your AI to revise the document. Reload to review again.
+1. 输入本地 `.md` 文件的绝对路径，点击 **Open path**。
+2. 在渲染后的文档中**选中文字**，弹出评论框，写下备注后按 **⌘+Enter** 保存。
+3. 评论会在文档中高亮显示，并列在侧边栏。
+4. 点击 **Copy Prompt** 将所有未解决的评论复制为结构化 prompt，粘贴给 AI 修改文档，刷新后继续评审。
 
 ### Copy Source
 
-**Copy Source** exports the document in different formats:
+**Copy Source** 支持将文档导出为不同格式：
 
-- **Markdown** — raw markdown with front matter stripped. Paste anywhere that accepts markdown.
-- **Confluence** — In Confluence editor, click **···** (top-right) → **Open in Source Editor**, then paste.
-- **Share Link** — copies `http://<LAN-IP>:<port>/?path=...` so teammates on the same network can open the same document directly.
+- **Markdown** — 去除 front matter 的原始 markdown，可粘贴到任何支持 markdown 的地方。
+- **Confluence** — 在 Confluence 编辑页面，点击右上角 **···** → **Open in Source Editor**，然后粘贴。
+- **Share Link** — 复制 `http://<局域网IP>:<端口>/?path=...`，局域网内的同事可以直接打开相同的文档。
 
-## Agent Skill install
+## Agent Skill 安装
 
-### Inside Shopee (公司内)
-
-Install the global Claude and Codex skill with:
+### 公司内网（Shopee）
 
 ```bash
 npx --registry=https://npm.shopee.io/ @foody/reviewable-md install-skill
 ```
 
-After that, compatible agents can open the latest generated or modified
-Markdown file with:
+安装后，AI Agent 可以通过以下命令打开最新生成或修改的 Markdown 文件：
 
 ```bash
 npx --registry=https://npm.shopee.io/ @foody/reviewable-md@latest open "/absolute/path/to/file.md"
 ```
 
-### Outside Shopee (外网)
-
-Install the global Claude and Codex skill with:
+### 外网
 
 ```bash
 npx reviewable-md install-skill
 ```
 
-After that, compatible agents can open the latest generated or modified
-Markdown file with:
+安装后，AI Agent 可以通过以下命令打开最新生成或修改的 Markdown 文件：
 
 ```bash
 npx reviewable-md@latest open "/absolute/path/to/file.md"
 ```
 
-This writes the bundled skill to:
+skill 文件会写入：
 
 ```text
 ~/.claude/skills/reviewable-md
 ~/.codex/skills/reviewable-md
 ```
 
-The `open` command starts one local background daemon if needed, reuses it for
-future files, and opens the browser at a disk-backed `?path=...` URL.
+`open` 命令会在需要时启动一个本地后台 daemon，后续文件复用同一个 daemon，并在浏览器中打开对应的 `?path=...` URL。
 
-## How it works
+## 工作原理
 
-- **Frontend** — Vite + React. Renders markdown with `react-markdown` + GFM.
-  Selections are anchored using a *text-quote selector* (quote + surrounding
-  context), so highlights survive markdown re-rendering.
-- **Local server** — `server/cli.js` serves the app and exposes
-  `GET /api/document?path=<absolute md path>` so refreshes can load the latest
-  file contents from disk. The **Open path** control updates the current URL to
-  that disk-backed path.
-- **Storage** — comments are stored in IndexedDB and keyed by absolute file path.
+- **前端** — Vite + React，使用 `react-markdown` + GFM 渲染 markdown。选区通过*文本引用锚点*（quote + 上下文）定位，高亮在重新渲染后仍然有效。
+- **本地服务器** — `server/cli.js` 提供静态服务，并暴露 `GET /api/document?path=<绝对路径>` 接口，刷新时从磁盘加载最新内容。
+- **存储** — 评论保存在 IndexedDB，以文件绝对路径为 key。
 
-## Stored document format
-
-IndexedDB records are stored in the `reviewable-md` database:
-
-```json
-{
-  "key": "/Users/me/project/sample.md",
-  "path": "/Users/me/project/sample.md",
-  "markdown": "# Project Proposal",
-  "updatedAt": "2026-06-23T11:01:22.348Z",
-  "comments": [
-    {
-      "id": "c_test",
-      "anchor": { "quote": "widget platform", "prefix": "build a **", "suffix": "** that lets" },
-      "body": "Define what counts as a widget.",
-      "resolved": false,
-      "createdAt": "2026-06-23T00:00:00Z"
-    }
-  ]
-}
-```
-
-## Build
+## 构建
 
 ```bash
-npm run build                  # outputs dist/
-npm run preview                # serves the built client through server/cli.js
+npm run build                  # 输出到 dist/
+npm run preview                # 通过 server/cli.js 预览构建产物
 ```
 
-## Publish
-
-The package is designed to be published to both public npm and Shopee's
-internal npm registry with the same version. The public npm package name is
-`reviewable-md`; the Shopee npm package name is temporarily rewritten to
-`@foody/reviewable-md` during publishing and restored afterwards.
+## 发布
 
 ```bash
-npm run publish:npm            # https://registry.npmjs.org/
-npm run publish:shopee         # https://npm.shopee.io/
-npm run publish:all            # public npm, then Shopee npm
+npm run publish:npm            # 发布到 https://registry.npmjs.org/
+npm run publish:shopee         # 发布到 https://npm.shopee.io/
+npm run publish:all            # 同时发布到两个 registry
 ```
 
-Authentication is handled by the local npm login or `.npmrc`; no tokens are
-stored in this repository.
-
-## Status
-
-Working local app with a thin disk-read server.
+英文文档见 [README.en.md](./README.en.md)。
