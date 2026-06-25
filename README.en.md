@@ -75,4 +75,12 @@ This writes the bundled skill to:
 The `open` command starts one local background daemon if needed, reuses it for
 future files, and opens the browser at a disk-backed `?path=...` URL.
 
+## How to use the skill
+
+Once installed, whenever an AI agent (e.g. Claude Code) generates or modifies a `.md` file, it will automatically open it in the browser via the skill. Leave inline comments on the page, then click **Copy Prompt** to paste them back to the AI for the next revision.
+
+You can also trigger it manually by telling the agent:
+
+> Open this file with reviewable-md
+
 Chinese documentation: [README.md](./README.md).

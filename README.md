@@ -39,6 +39,14 @@ skill 文件会写入：
 
 `open` 命令会在需要时启动一个本地后台 daemon，后续文件复用同一个 daemon，并在浏览器中打开对应的 `?path=...` URL。
 
+## Skill 使用方法
+
+安装完成后，每当 AI Agent（如 Claude Code）生成或修改了 `.md` 文件，它会自动调用 skill 在浏览器中打开该文件。你可以直接在页面上留评论，然后点击 **Copy Prompt** 将评论复制给 AI，让它继续修改。
+
+也可以手动触发，在对话中告诉 Agent：
+
+> 用 reviewable-md 打开这个文件
+
 ## 快速开始
 
 ### 公司内网（Shopee）
