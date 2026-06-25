@@ -54,7 +54,8 @@ export default function App() {
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
   const [copied, setCopied] = useState(false)
-  const [copiedConfluence, setCopiedConfluence] = useState(false)
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
+  const [copiedSource, setCopiedSource] = useState(null)
   const contentRef = useRef(null)
 
   // Restore from the URL first so refreshes re-read the latest disk content.
@@ -196,12 +197,27 @@ export default function App() {
     setTimeout(() => setCopied(false), 1500)
   }
 
-  async function copyToConfluence() {
+  function markSourceCopied(label) {
+    setCopiedSource(label)
+    setSourceMenuOpen(false)
+    setTimeout(() => setCopiedSource(null), 1500)
+  }
+
+  async function copyMarkdownSource() {
+    try {
+      await navigator.clipboard.writeText(stripFrontMatter(doc.markdown))
+      markSourceCopied('Markdown')
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function copyConfluenceSourceForEditor() {
     try {
       await copyConfluenceSource(contentRef.current)
-      setCopiedConfluence(true)
+      markSourceCopied('Confluence')
       setError(null)
-      setTimeout(() => setCopiedConfluence(false), 1500)
     } catch (e) {
       setError(e.message)
     }
@@ -256,9 +272,22 @@ export default function App() {
           >
             🧹
           </button>
-          <button className="rmd-secondary-btn" onClick={copyToConfluence}>
-            {copiedConfluence ? '✓ Copied' : 'Copy Confluence Source'}
-          </button>
+          <div className="rmd-copy-menu">
+            <button
+              className="rmd-secondary-btn rmd-copy-menu-trigger"
+              onClick={() => setSourceMenuOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={sourceMenuOpen}
+            >
+              {copiedSource ? `Copied ${copiedSource}` : 'Copy Source'}
+            </button>
+            {sourceMenuOpen && (
+              <div className="rmd-copy-menu-list" role="menu">
+                <button role="menuitem" onClick={copyMarkdownSource}>Markdown</button>
+                <button role="menuitem" onClick={copyConfluenceSourceForEditor}>Confluence</button>
+              </div>
+            )}
+          </div>
           <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
             {copied ? '✓ Copied' : 'Copy for AI'}
           </button>

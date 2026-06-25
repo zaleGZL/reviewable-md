@@ -301,7 +301,32 @@ describe('App copy for AI', () => {
   })
 })
 
-describe('App copy to Confluence', () => {
+describe('App source copy menu', () => {
+  it('writes markdown source to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    loadLastDocument.mockResolvedValue({
+      ...DOC,
+      markdown: '---\nname: hidden\n---\n# Title\n\nBody',
+    })
+    render(<App />)
+    await screen.findByText('Title')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Source' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Markdown' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0]).toBe('# Title\n\nBody')
+
+    if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard)
+    else delete navigator.clipboard
+  })
+
   it('writes Confluence Source Editor markup to the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue()
     const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
@@ -315,7 +340,8 @@ describe('App copy to Confluence', () => {
     render(<App />)
     await screen.findByText('Title')
 
-    fireEvent.click(screen.getByRole('button', { name: /Copy Confluence Source/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Source' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Confluence' }))
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toContain('<h1>Title</h1>')
     expect(writeText.mock.calls[0][0]).toContain('<p>Body</p>')
