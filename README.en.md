@@ -77,30 +77,4 @@ This writes the bundled skill to:
 The `open` command starts one local background daemon if needed, reuses it for
 future files, and opens the browser at a disk-backed `?path=...` URL.
 
-## How it works
-
-- **Frontend** — Vite + React. Renders markdown with `react-markdown` + GFM.
-  Selections are anchored using a *text-quote selector* (quote + surrounding
-  context), so highlights survive markdown re-rendering.
-- **Local server** — `server/cli.js` serves the app and exposes
-  `GET /api/document?path=<absolute md path>` so refreshes can load the latest
-  file contents from disk. The **Open path** control updates the current URL to
-  that disk-backed path.
-- **Storage** — comments are stored in IndexedDB and keyed by absolute file path.
-
-## Build
-
-```bash
-npm run build                  # outputs dist/
-npm run preview                # serves the built client through server/cli.js
-```
-
-## Publish
-
-```bash
-npm run publish:npm            # https://registry.npmjs.org/
-npm run publish:shopee         # https://npm.shopee.io/
-npm run publish:all            # public npm, then Shopee npm
-```
-
 Chinese documentation: [README.md](./README.md).

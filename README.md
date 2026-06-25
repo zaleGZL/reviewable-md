@@ -72,25 +72,4 @@ skill 文件会写入：
 
 `open` 命令会在需要时启动一个本地后台 daemon，后续文件复用同一个 daemon，并在浏览器中打开对应的 `?path=...` URL。
 
-## 工作原理
-
-- **前端** — Vite + React，使用 `react-markdown` + GFM 渲染 markdown。选区通过*文本引用锚点*（quote + 上下文）定位，高亮在重新渲染后仍然有效。
-- **本地服务器** — `server/cli.js` 提供静态服务，并暴露 `GET /api/document?path=<绝对路径>` 接口，刷新时从磁盘加载最新内容。
-- **存储** — 评论保存在 IndexedDB，以文件绝对路径为 key。
-
-## 构建
-
-```bash
-npm run build                  # 输出到 dist/
-npm run preview                # 通过 server/cli.js 预览构建产物
-```
-
-## 发布
-
-```bash
-npm run publish:npm            # 发布到 https://registry.npmjs.org/
-npm run publish:shopee         # 发布到 https://npm.shopee.io/
-npm run publish:all            # 同时发布到两个 registry
-```
-
 英文文档见 [README.en.md](./README.en.md)。
