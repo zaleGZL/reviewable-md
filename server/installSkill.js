@@ -29,7 +29,7 @@ export async function installSkill({
   source,
   home = os.homedir(),
   dryRun = false,
-  force = false,
+  force = true,
 } = {}) {
   if (!source) throw new Error('Missing bundled skill source path')
   const targets = skillTargets(home)
