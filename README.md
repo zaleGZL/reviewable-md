@@ -12,22 +12,10 @@
 npx --registry=https://npm.shopee.io/ @foody/reviewable-md install-skill
 ```
 
-安装后，AI Agent 可以通过以下命令打开最新生成或修改的 Markdown 文件：
-
-```bash
-npx --registry=https://npm.shopee.io/ @foody/reviewable-md@latest open "/absolute/path/to/file.md"
-```
-
 ### 外网
 
 ```bash
 npx reviewable-md install-skill
-```
-
-安装后，AI Agent 可以通过以下命令打开最新生成或修改的 Markdown 文件：
-
-```bash
-npx reviewable-md@latest open "/absolute/path/to/file.md"
 ```
 
 skill 文件会写入：
@@ -36,8 +24,6 @@ skill 文件会写入：
 ~/.claude/skills/reviewable-md
 ~/.codex/skills/reviewable-md
 ```
-
-`open` 命令会在需要时启动一个本地后台 daemon，后续文件复用同一个 daemon，并在浏览器中打开对应的 `?path=...` URL。
 
 ## Skill 使用方法
 

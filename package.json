@@ -1,6 +1,6 @@
 {
   "name": "reviewable-md",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "type": "module",
   "description": "Preview a markdown file, leave inline review comments, and copy them back to an AI for the next edit.",
   "bin": {
