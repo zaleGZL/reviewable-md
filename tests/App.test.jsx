@@ -239,32 +239,30 @@ describe('App resolve and delete', () => {
   })
 
   it('clears all comments from the header after confirmation', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
     render(<App />)
     await screen.findByText('Clarify this.')
 
     await user.click(screen.getByRole('button', { name: 'Clear all comments' }))
+    await screen.findByRole('heading', { name: 'Delete all comments?' })
+    await user.click(screen.getByRole('button', { name: 'Delete all comments' }))
 
-    expect(confirmSpy).toHaveBeenCalledWith('Delete all comments? This cannot be undone.')
     await waitFor(() => expect(saveComments).toHaveBeenCalled())
     expect(saveComments.mock.calls.at(-1)[1]).toEqual([])
-    confirmSpy.mockRestore()
   })
 
   it('does not clear comments when confirmation is cancelled', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const user = userEvent.setup()
     loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
     render(<App />)
     await screen.findByText('Clarify this.')
 
     await user.click(screen.getByRole('button', { name: 'Clear all comments' }))
+    await screen.findByRole('heading', { name: 'Delete all comments?' })
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    expect(confirmSpy).toHaveBeenCalled()
     expect(saveComments).not.toHaveBeenCalled()
-    confirmSpy.mockRestore()
   })
 })
 
@@ -303,6 +301,7 @@ describe('App copy for AI', () => {
 
 describe('App source copy menu', () => {
   it('writes markdown source to the clipboard', async () => {
+    const user = userEvent.setup()
     const writeText = vi.fn().mockResolvedValue()
     const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
 
@@ -318,8 +317,8 @@ describe('App source copy menu', () => {
     render(<App />)
     await screen.findByText('Title')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Source' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Markdown' }))
+    await user.click(screen.getByRole('button', { name: 'Copy Source' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Markdown' }))
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toBe('# Title\n\nBody')
 
@@ -328,6 +327,7 @@ describe('App source copy menu', () => {
   })
 
   it('writes Confluence Source Editor markup to the clipboard', async () => {
+    const user = userEvent.setup()
     const writeText = vi.fn().mockResolvedValue()
     const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
 
@@ -340,8 +340,8 @@ describe('App source copy menu', () => {
     render(<App />)
     await screen.findByText('Title')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Source' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Confluence' }))
+    await user.click(screen.getByRole('button', { name: 'Copy Source' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Confluence' }))
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toContain('<h1>Title</h1>')
     expect(writeText.mock.calls[0][0]).toContain('<p>Body</p>')

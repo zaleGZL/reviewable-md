@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
+import { Check, Laptop, Moon, Sun } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const THEMES = [
-  { key: 'light', label: 'Light', icon: '☀️' },
-  { key: 'dark', label: 'Dark', icon: '🌙' },
-  { key: 'system', label: 'System', icon: '🖥️' },
+  { key: 'light', label: 'Light', Icon: Sun },
+  { key: 'dark', label: 'Dark', Icon: Moon },
+  { key: 'system', label: 'System', Icon: Laptop },
 ]
 function getSystemDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -31,48 +35,39 @@ export default function ThemeToggle() {
     return () => mq.removeEventListener('change', handler)
   }, [mode])
 
-  useEffect(() => {
-    if (!open) return
-    const handler = () => setOpen(false)
-    const timer = setTimeout(() => document.addEventListener('click', handler), 0)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('click', handler)
-    }
-  }, [open])
-
   const current = THEMES.find((t) => t.key === mode)
+  const CurrentIcon = current.Icon
 
   return (
-    <div className="rmd-theme-toggle">
-      <button
-        className="rmd-theme-btn"
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(!open)
-        }}
-        title="Switch theme"
-      >
-        {current.icon}
-      </button>
-      {open && (
-        <div className="rmd-theme-menu">
-          {THEMES.map((t) => (
-            <button
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          title="Switch theme"
+          aria-label="Switch theme"
+        >
+          <CurrentIcon aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-36">
+        {THEMES.map((t) => {
+          const Icon = t.Icon
+          return (
+            <DropdownMenuItem
               key={t.key}
-              className={'rmd-theme-option' + (t.key === mode ? ' active' : '')}
-              onClick={(e) => {
-                e.stopPropagation()
+              onClick={() => {
                 setMode(t.key)
                 setOpen(false)
               }}
             >
-              <span>{t.icon} {t.label}</span>
-              {t.key === mode && <span className="rmd-theme-check">✓</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+              <Icon aria-hidden="true" />
+              <span>{t.label}</span>
+              {t.key === mode && <Check className="ml-auto" aria-hidden="true" />}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

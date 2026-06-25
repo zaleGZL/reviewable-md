@@ -7,6 +7,15 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import './hljs-theme.css'
 import {
+  Check,
+  ChevronDown,
+  Copy,
+  FileText,
+  FolderOpen,
+  MessageSquareText,
+  Trash2,
+} from 'lucide-react'
+import {
   fetchServerDocument,
   loadDocument,
   loadLastDocument,
@@ -19,6 +28,16 @@ import { copyConfluenceSource } from './confluenceCopy'
 import { stripFrontMatter } from './frontMatter'
 import Mermaid from './Mermaid.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 // Custom renderer for fenced code: ```mermaid becomes a diagram, everything
 // else falls through to react-markdown's default (with rehype-highlight applied).
@@ -185,9 +204,7 @@ export default function App() {
   }
 
   function clearComments() {
-    if (confirm('Delete all comments? This cannot be undone.')) {
-      persist([])
-    }
+    persist([])
   }
 
   async function copyForAi() {
@@ -227,26 +244,36 @@ export default function App() {
 
   if (!doc) {
     return (
-      <div className="rmd-empty">
+      <div className="min-h-screen bg-background text-foreground">
         <header className="rmd-header">
-          <div className="rmd-title">Reviewable Markdown</div>
+          <div className="flex items-center gap-2 font-mono text-sm font-semibold">
+            <FileText className="size-4 text-primary" aria-hidden="true" />
+            Reviewable Markdown
+          </div>
           <ThemeToggle />
         </header>
         <main className="rmd-picker">
-          <div className="rmd-picker-panel">
-            <h1>Open a markdown file</h1>
-            <p>Enter the full path to a local .md file.</p>
-            <form className="rmd-path-form" onSubmit={onOpenPath}>
-              <input
-                aria-label="Markdown file path"
-                value={pathText}
-                placeholder="/Users/me/project/spec.md"
-                onChange={(e) => setPathText(e.target.value)}
-              />
-              <button className="rmd-secondary-btn" type="submit">Open path</button>
-            </form>
-            {error && <p className="rmd-error-text">Error: {error}</p>}
-          </div>
+          <Card className="w-full max-w-xl">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Open a markdown file</CardTitle>
+              <CardDescription>Enter the full path to a local .md file.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="rmd-path-form" onSubmit={onOpenPath}>
+                <Input
+                  aria-label="Markdown file path"
+                  value={pathText}
+                  placeholder="/Users/me/project/spec.md"
+                  onChange={(e) => setPathText(e.target.value)}
+                />
+                <Button type="submit">
+                  <FolderOpen aria-hidden="true" />
+                  Open path
+                </Button>
+              </form>
+              {error && <p className="rmd-error-text">Error: {error}</p>}
+            </CardContent>
+          </Card>
         </main>
       </div>
     )
@@ -257,114 +284,154 @@ export default function App() {
   const displayName = doc.fileMeta?.name || displayNameForPath(doc.path)
 
   return (
-    <div className="rmd-layout">
-      <header className="rmd-header">
-        <div className="rmd-title" title={doc.path}>📝 {displayName}</div>
-        <div className="rmd-actions">
-          <span className="rmd-count">{open.length} open / {comments.length} total</span>
-          <ThemeToggle />
-          <button
-            className="rmd-icon-btn"
-            onClick={clearComments}
-            disabled={!comments.length}
-            title="Clear all comments"
-            aria-label="Clear all comments"
-          >
-            🧹
-          </button>
-          <div className="rmd-copy-menu">
-            <button
-              className="rmd-secondary-btn rmd-copy-menu-trigger"
-              onClick={() => setSourceMenuOpen((open) => !open)}
-              aria-haspopup="menu"
-              aria-expanded={sourceMenuOpen}
-            >
-              {copiedSource ? `Copied ${copiedSource}` : 'Copy Source'}
-            </button>
-            {sourceMenuOpen && (
-              <div className="rmd-copy-menu-list" role="menu">
-                <button role="menuitem" onClick={copyMarkdownSource}>Markdown</button>
-                <button role="menuitem" onClick={copyConfluenceSourceForEditor}>Confluence</button>
-              </div>
-            )}
+    <TooltipProvider>
+      <div className="min-h-screen bg-background text-foreground">
+        <header className="rmd-header">
+          <div className="flex min-w-0 items-center gap-2 font-mono text-sm font-semibold" title={doc.path}>
+            <FileText className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span className="truncate" title={doc.path}>{displayName}</span>
           </div>
-          <button className="rmd-btn" onClick={copyForAi} disabled={!comments.length}>
-            {copied ? '✓ Copied' : 'Copy for AI'}
-          </button>
-        </div>
-      </header>
-      <form className="rmd-path-bar" onSubmit={onOpenPath}>
-        <input
-          aria-label="Markdown file path"
-          value={pathText}
-          placeholder="/Users/me/project/spec.md"
-          onChange={(e) => setPathText(e.target.value)}
-        />
-        <button className="rmd-secondary-btn" type="submit">Open path</button>
-      </form>
-      {error && <div className="rmd-banner-error">Error: {error}</div>}
-
-      <main className="rmd-main">
-        <article
-          ref={contentRef}
-          className="rmd-content"
-          onMouseUp={onMouseUp}
-        >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeHighlight, rehypeKatex]}
-            components={mdComponents}
-          >
-            {visibleMarkdown}
-          </ReactMarkdown>
-        </article>
-
-        <aside className="rmd-sidebar">
-          <div className="rmd-sidebar-header">
-            <h2>Comments</h2>
+          <div className="rmd-actions">
+            <Badge variant="secondary" className="hidden sm:inline-flex">
+              {open.length} open / {comments.length} total
+            </Badge>
+            <ThemeToggle />
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      disabled={!comments.length}
+                      aria-label="Clear all comments"
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Clear all comments</TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete all comments?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This cannot be undone. The current document stays open, but every saved comment for it will be removed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90" onClick={clearComments}>
+                    Delete all comments
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <DropdownMenu open={sourceMenuOpen} onOpenChange={setSourceMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="min-w-[132px]">
+                  <Copy aria-hidden="true" />
+                  {copiedSource ? `Copied ${copiedSource}` : 'Copy Source'}
+                  <ChevronDown aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={copyMarkdownSource}>Markdown</DropdownMenuItem>
+                <DropdownMenuItem onClick={copyConfluenceSourceForEditor}>Confluence</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={copyForAi} disabled={!comments.length}>
+              {copied ? <Check aria-hidden="true" /> : <MessageSquareText aria-hidden="true" />}
+              {copied ? 'Copied' : 'Copy for AI'}
+            </Button>
           </div>
-          {comments.length === 0 && (
-            <p className="rmd-hint">Select any text in the document to add a comment.</p>
-          )}
-          {comments.map((c) => (
-            <div
-              key={c.id}
-              id={'card-' + c.id}
-              className={'rmd-card' + (c.resolved ? ' rmd-card-resolved' : '')}
-            >
-              <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
-              <p className="rmd-body">{c.body}</p>
-              <div className="rmd-card-actions">
-                <button onClick={() => toggleResolved(c.id)}>
-                  {c.resolved ? 'Reopen' : 'Resolve'}
-                </button>
-                <button onClick={() => deleteComment(c.id)}>Delete</button>
-              </div>
-            </div>
-          ))}
-        </aside>
-      </main>
-
-      {draft && (
-        <div className="rmd-draft" style={{ top: draft.top }}>
-          <blockquote className="rmd-quote">{draft.anchor.quote}</blockquote>
-          <textarea
-            autoFocus
-            value={draftText}
-            placeholder="Write a comment…"
-            onChange={(e) => setDraftText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addComment()
-              if (e.key === 'Escape') setDraft(null)
-            }}
+        </header>
+        <form className="rmd-path-bar" onSubmit={onOpenPath}>
+          <Input
+            aria-label="Markdown file path"
+            value={pathText}
+            placeholder="/Users/me/project/spec.md"
+            onChange={(e) => setPathText(e.target.value)}
           />
-          <div className="rmd-draft-actions">
-            <button className="rmd-btn" onClick={addComment}>Comment</button>
-            <button onClick={() => setDraft(null)}>Cancel</button>
-            <span className="rmd-kbd">⌘+Enter</span>
-          </div>
-        </div>
-      )}
-    </div>
+          <Button variant="outline" type="submit">
+            <FolderOpen aria-hidden="true" />
+            Open path
+          </Button>
+        </form>
+        {error && <div className="rmd-banner-error">Error: {error}</div>}
+
+        <main className="rmd-main">
+          <article
+            ref={contentRef}
+            className="rmd-content"
+            onMouseUp={onMouseUp}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeHighlight, rehypeKatex]}
+              components={mdComponents}
+            >
+              {visibleMarkdown}
+            </ReactMarkdown>
+          </article>
+
+          <aside className="rmd-sidebar">
+            <div className="rmd-sidebar-header">
+              <h2>Comments</h2>
+            </div>
+            {comments.length === 0 && (
+              <p className="rmd-hint">Select any text in the document to add a comment.</p>
+            )}
+            <div className="grid gap-3">
+              {comments.map((c) => (
+                <Card
+                  key={c.id}
+                  id={'card-' + c.id}
+                  className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved')}
+                >
+                  <CardContent className="px-4">
+                    <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
+                    <p className="rmd-body">{c.body}</p>
+                    <Separator className="my-3" />
+                    <div className="rmd-card-actions">
+                      <Button variant="outline" size="sm" onClick={() => toggleResolved(c.id)}>
+                        {c.resolved ? 'Reopen' : 'Resolve'}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteComment(c.id)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </aside>
+        </main>
+
+        {draft && (
+          <Card className="rmd-draft gap-3 py-4" style={{ top: draft.top }}>
+            <CardContent className="px-4">
+              <blockquote className="rmd-quote">{draft.anchor.quote}</blockquote>
+              <Textarea
+                autoFocus
+                value={draftText}
+                placeholder="Write a comment..."
+                className="mb-3 min-h-24 resize-y"
+                onChange={(e) => setDraftText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addComment()
+                  if (e.key === 'Escape') setDraft(null)
+                }}
+              />
+              <div className="rmd-draft-actions">
+                <Button onClick={addComment}>Comment</Button>
+                <Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+                <span className="rmd-kbd">Cmd+Enter</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </TooltipProvider>
   )
 }

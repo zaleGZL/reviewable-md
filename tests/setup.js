@@ -29,3 +29,15 @@ if (!window.matchMedia) {
     dispatchEvent: vi.fn(),
   }))
 }
+
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
+
+if (!window.PointerEvent) {
+  window.PointerEvent = MouseEvent
+}

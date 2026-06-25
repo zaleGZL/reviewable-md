@@ -2,6 +2,7 @@
 import './setup.js'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 // Mock the lazily-imported mermaid module. render() is controlled per test.
 const renderMock = vi.fn()
@@ -58,5 +59,26 @@ describe('Mermaid', () => {
     // The fallback uses a <pre class="rmd-mermaid-error"> and no diagram div.
     expect(container.querySelector('pre.rmd-mermaid-error')).toBeTruthy()
     expect(container.querySelector('.rmd-mermaid')).toBeNull()
+  })
+
+  it('opens an expanded zoomable diagram view', async () => {
+    const user = userEvent.setup()
+    renderMock.mockResolvedValue({ svg: '<svg data-testid="diagram"></svg>' })
+    const Mermaid = await freshMermaid()
+    render(<Mermaid code="flowchart LR; A-->B" />)
+
+    await screen.findByTestId('diagram')
+    await user.click(screen.getByRole('button', { name: 'Expand diagram' }))
+    expect(screen.getByRole('dialog', { name: 'Expanded Mermaid diagram' })).toBeInTheDocument()
+    expect(screen.getByText('100%')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(screen.getByText('125%')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Reset zoom' }))
+    expect(screen.getByText('100%')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Close expanded diagram' }))
+    expect(screen.queryByRole('dialog', { name: 'Expanded Mermaid diagram' })).toBeNull()
   })
 })
