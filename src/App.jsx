@@ -13,6 +13,7 @@ import {
   FileText,
   FolderOpen,
   MessageSquareText,
+  Save,
   Trash2,
 } from 'lucide-react'
 import {
@@ -72,11 +73,17 @@ export default function App() {
   const [pathText, setPathText] = useState(() => new URLSearchParams(window.location.search).get('path') || '')
   const [draft, setDraft] = useState(null) // { anchor, x, y }
   const [draftText, setDraftText] = useState('')
+  const [mode, setMode] = useState('view') // 'view' | 'edit'
+  const [editText, setEditText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editingText, setEditingText] = useState('')
   const [copied, setCopied] = useState(false)
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [copiedSource, setCopiedSource] = useState(null)
   const [lanInfo, setLanInfo] = useState({ ips: [], port: null })
   const contentRef = useRef(null)
+  const editorRef = useRef(null)
 
   useEffect(() => {
     fetch('/api/network-info')
@@ -215,6 +222,68 @@ export default function App() {
     persist([])
   }
 
+  function startEditComment(c) {
+    setEditingId(c.id)
+    setEditingText(c.body)
+  }
+
+  function saveEditComment(id) {
+    if (!editingText.trim()) return
+    persist(comments.map((c) => (c.id === id ? { ...c, body: editingText.trim() } : c)))
+    setEditingId(null)
+    setEditingText('')
+  }
+
+  function cancelEditComment() {
+    setEditingId(null)
+    setEditingText('')
+  }
+
+  function switchMode(next) {
+    if (next === 'edit') {
+      setEditText(doc.markdown)
+      setDraft(null)
+      setDraftText('')
+    }
+    setMode(next)
+  }
+
+  async function saveToServer() {
+    if (!doc || saving) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: doc.path, markdown: editText }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Server error ${res.status}`)
+      }
+      const updatedDoc = { ...doc, markdown: editText }
+      setDoc(updatedDoc)
+      await saveDocument(updatedDoc, comments)
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Cmd+S / Ctrl+S saves in editor mode.
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (mode === 'edit' && e.key === 's' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        saveToServer()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode, saving, doc, editText, comments])
+
   async function copyForAi() {
     const text = buildAiPrompt(doc, comments)
     await navigator.clipboard.writeText(text)
@@ -314,6 +383,28 @@ export default function App() {
             <span className="truncate" title={doc.path}>{displayName}</span>
           </div>
           <div className="rmd-actions">
+            <div className="rmd-mode-tabs">
+              <Button
+                variant={mode === 'view' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => switchMode('view')}
+              >
+                Preview
+              </Button>
+              <Button
+                variant={mode === 'edit' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => switchMode('edit')}
+              >
+                Editor
+              </Button>
+            </div>
+            {mode === 'edit' && (
+              <Button size="sm" onClick={saveToServer} disabled={saving}>
+                <Save aria-hidden="true" />
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            )}
             <Badge variant="secondary" className="hidden sm:inline-flex">
               {open.length} open / {comments.length} total
             </Badge>
@@ -383,52 +474,89 @@ export default function App() {
         </form>
         {error && <div className="rmd-banner-error">Error: {error}</div>}
 
-        <main className="rmd-main">
-          <article
-            ref={contentRef}
-            className="rmd-content"
-            onMouseUp={onMouseUp}
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeHighlight, rehypeKatex]}
-              components={mdComponents}
+        <main className={cn('rmd-main', mode === 'edit' && 'rmd-main--editor')}>
+          {mode === 'edit' ? (
+            <textarea
+              ref={editorRef}
+              className="rmd-editor"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              spellCheck={false}
+            />
+          ) : (
+            <article
+              ref={contentRef}
+              className="rmd-content"
+              onMouseUp={onMouseUp}
             >
-              {visibleMarkdown}
-            </ReactMarkdown>
-          </article>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                components={mdComponents}
+              >
+                {visibleMarkdown}
+              </ReactMarkdown>
+            </article>
+          )}
 
-          <aside className="rmd-sidebar">
-            <div className="rmd-sidebar-header">
-              <h2>Comments</h2>
-            </div>
-            {comments.length === 0 && (
-              <p className="rmd-hint">Select any text in the document to add a comment.</p>
-            )}
-            <div className="grid gap-3">
-              {comments.map((c) => (
-                <Card
-                  key={c.id}
-                  id={'card-' + c.id}
-                  className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved')}
-                >
-                  <CardContent className="px-4">
-                    <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
-                    <p className="rmd-body">{c.body}</p>
-                    <Separator className="my-3" />
-                    <div className="rmd-card-actions">
-                      <Button variant="outline" size="sm" onClick={() => toggleResolved(c.id)}>
-                        {c.resolved ? 'Reopen' : 'Resolve'}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteComment(c.id)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </aside>
+          {mode === 'view' && (
+            <aside className="rmd-sidebar">
+              <div className="rmd-sidebar-header">
+                <h2>Comments</h2>
+              </div>
+              {comments.length === 0 && (
+                <p className="rmd-hint">Select any text in the document to add a comment.</p>
+              )}
+              <div className="grid gap-3">
+                {comments.map((c) => (
+                  <Card
+                    key={c.id}
+                    id={'card-' + c.id}
+                    className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved')}
+                  >
+                    <CardContent className="px-4">
+                      <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
+                      {editingId === c.id ? (
+                        <>
+                          <Textarea
+                            autoFocus
+                            value={editingText}
+                            className="mb-3 min-h-20 resize-y"
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEditComment(c.id)
+                              if (e.key === 'Escape') cancelEditComment()
+                            }}
+                          />
+                          <div className="rmd-card-actions">
+                            <Button size="sm" onClick={() => saveEditComment(c.id)}>Save</Button>
+                            <Button variant="outline" size="sm" onClick={cancelEditComment}>Cancel</Button>
+                            <span className="rmd-kbd">Cmd+Enter</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="rmd-body">{c.body}</p>
+                          <Separator className="my-3" />
+                          <div className="rmd-card-actions">
+                            <Button variant="outline" size="sm" onClick={() => toggleResolved(c.id)}>
+                              {c.resolved ? 'Reopen' : 'Resolve'}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => startEditComment(c)}>
+                              Edit
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => deleteComment(c.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </aside>
+          )}
         </main>
 
         {draft && (

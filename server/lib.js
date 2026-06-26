@@ -130,8 +130,31 @@ export function createHandler({ dev = false, dist, vitePort, port }) {
       }
 
       if (url.pathname === '/api/document') {
-        if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' })
-        return sendJson(res, 200, await readMarkdownDocument(url.searchParams.get('path')))
+        if (req.method === 'GET') {
+          return sendJson(res, 200, await readMarkdownDocument(url.searchParams.get('path')))
+        }
+        if (req.method === 'POST') {
+          const body = await new Promise((resolve, reject) => {
+            let data = ''
+            req.on('data', (chunk) => { data += chunk })
+            req.on('end', () => {
+              try { resolve(JSON.parse(data)) } catch { reject(Object.assign(new Error('Invalid JSON'), { status: 400 })) }
+            })
+            req.on('error', reject)
+          })
+          const { path: filePath, markdown } = body || {}
+          if (!filePath || typeof markdown !== 'string') {
+            return sendJson(res, 400, { error: 'Missing path or markdown' })
+          }
+          const mdPath = path.resolve(filePath)
+          if (!/\.md$/i.test(mdPath)) {
+            return sendJson(res, 400, { error: 'Only .md files are supported' })
+          }
+          await fsp.access(mdPath)
+          await fsp.writeFile(mdPath, markdown, 'utf8')
+          return sendJson(res, 200, { ok: true })
+        }
+        return sendJson(res, 405, { error: 'Method not allowed' })
       }
 
       if (url.pathname === '/api/network-info') {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import './setup.js'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -61,6 +61,12 @@ beforeEach(() => {
   loadLastDocument.mockReset().mockResolvedValue(DOC)
   saveDocument.mockReset().mockImplementation(async (doc, comments = []) => ({ ...doc, comments }))
   saveComments.mockReset().mockResolvedValue({ ok: true })
+  // Stub global fetch for network-info (called on mount) and any POST saves.
+  global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ips: [], port: null }) })
+})
+
+afterEach(() => {
+  delete global.fetch
 })
 
 describe('App loading and error states', () => {
@@ -215,6 +221,107 @@ describe('App adding a comment', () => {
   })
 })
 
+describe('App edit comment', () => {
+  it('shows Edit button on each comment card', async () => {
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+  })
+
+  it('clicking Edit replaces comment body with a textarea pre-filled with the current text', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+
+    const textarea = screen.getByDisplayValue('Clarify this.')
+    expect(textarea).toBeInTheDocument()
+    // The <p> read-only view should be gone; only the textarea remains
+    expect(document.querySelector('.rmd-card .rmd-body')).toBeNull()
+  })
+
+  it('saves the edited comment body on Save click', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const textarea = screen.getByDisplayValue('Clarify this.')
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated comment text')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(saveComments).toHaveBeenCalled())
+    const saved = saveComments.mock.calls.at(-1)[1]
+    expect(saved[0].body).toBe('Updated comment text')
+    expect(saved[0].id).toBe('c1')
+    // back to read mode
+    expect(screen.getByText('Updated comment text')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Updated comment text')).toBeNull()
+  })
+
+  it('saves on Cmd+Enter', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const textarea = screen.getByDisplayValue('Clarify this.')
+    await user.clear(textarea)
+    await user.type(textarea, 'Via shortcut')
+    fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true })
+
+    await waitFor(() => expect(saveComments).toHaveBeenCalled())
+    expect(saveComments.mock.calls.at(-1)[1][0].body).toBe('Via shortcut')
+  })
+
+  it('cancels the edit without saving on Cancel click', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.clear(screen.getByDisplayValue('Clarify this.'))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(saveComments).not.toHaveBeenCalled()
+    expect(screen.getByText('Clarify this.')).toBeInTheDocument()
+  })
+
+  it('cancels on Escape', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const textarea = screen.getByDisplayValue('Clarify this.')
+    fireEvent.keyDown(textarea, { key: 'Escape' })
+
+    expect(saveComments).not.toHaveBeenCalled()
+    expect(screen.getByText('Clarify this.')).toBeInTheDocument()
+  })
+
+  it('does not save an empty body', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.clear(screen.getByDisplayValue('Clarify this.'))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(saveComments).not.toHaveBeenCalled()
+  })
+})
+
 describe('App resolve and delete', () => {
   it('resolves a comment', async () => {
     const user = userEvent.setup()
@@ -348,6 +455,160 @@ describe('App source copy menu', () => {
 
     if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard)
     else delete navigator.clipboard
+  })
+})
+
+describe('App editor mode', () => {
+  it('starts in Preview mode with the Preview button active', async () => {
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Editor' })).toBeInTheDocument()
+    // textarea should not be visible in view mode
+    expect(document.querySelector('.rmd-editor')).toBeNull()
+    // article content should be visible
+    expect(document.querySelector('.rmd-content')).not.toBeNull()
+  })
+
+  it('switches to Editor mode and shows a textarea with the document content', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+
+    const textarea = document.querySelector('.rmd-editor')
+    expect(textarea).not.toBeNull()
+    expect(textarea.value).toBe(DOC.markdown)
+    // rendered article should be gone
+    expect(document.querySelector('.rmd-content')).toBeNull()
+  })
+
+  it('shows the Save button only in Editor mode', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    expect(screen.queryByRole('button', { name: /Save/ })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.queryByRole('button', { name: /Save/ })).toBeNull()
+  })
+
+  it('hides the comments sidebar in Editor mode', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({ ...DOC, comments: [comment()] })
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+    expect(document.querySelector('.rmd-sidebar')).toBeNull()
+  })
+
+  it('initialises the textarea with the full markdown including front matter', async () => {
+    const user = userEvent.setup()
+    loadLastDocument.mockResolvedValue({
+      ...DOC,
+      markdown: '---\ntitle: hidden\n---\n# Visible\n',
+    })
+    render(<App />)
+    await screen.findByText('Visible')
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+    const textarea = document.querySelector('.rmd-editor')
+    expect(textarea.value).toBe('---\ntitle: hidden\n---\n# Visible\n')
+  })
+
+  it('Save button POSTs edited content and updates the document in state', async () => {
+    const user = userEvent.setup()
+    // Override fetch for this test: network-info returns empty, POST /api/document returns ok.
+    global.fetch = vi.fn().mockImplementation((url, opts) => {
+      if (opts?.method === 'POST') return Promise.resolve({ ok: true, json: async () => ({ ok: true }) })
+      return Promise.resolve({ ok: true, json: async () => ({ ips: [], port: null }) })
+    })
+
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+
+    const textarea = document.querySelector('.rmd-editor')
+    fireEvent.change(textarea, { target: { value: '# Edited content\n' } })
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    const postCall = await waitFor(() => {
+      const call = global.fetch.mock.calls.find(([url, opts]) => opts?.method === 'POST')
+      expect(call).toBeDefined()
+      return call
+    })
+    const body = JSON.parse(postCall[1].body)
+    expect(body.path).toBe('spec.md')
+    expect(body.markdown).toBe('# Edited content\n')
+  })
+
+  it('Cmd+S triggers save in Editor mode', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+
+    fireEvent.keyDown(window, { key: 's', metaKey: true })
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(([, opts]) => opts?.method === 'POST')
+      expect(postCall).toBeDefined()
+    })
+  })
+
+  it('Cmd+S does nothing in Preview mode', async () => {
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    fireEvent.keyDown(window, { key: 's', metaKey: true })
+
+    await new Promise((r) => setTimeout(r, 50))
+    const postCall = global.fetch.mock.calls.find(([, opts]) => opts?.method === 'POST')
+    expect(postCall).toBeUndefined()
+  })
+
+  it('shows an error banner when Save fails', async () => {
+    global.fetch = vi.fn().mockImplementation((url, opts) => {
+      if (opts?.method === 'POST') return Promise.resolve({ ok: false, json: async () => ({ error: 'Write failed' }) })
+      return Promise.resolve({ ok: true, json: async () => ({ ips: [], port: null }) })
+    })
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByText(/Write failed/)
+  })
+
+  it('switching back to Preview shows updated content after save', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/quick brown fox/)
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+
+    const textarea = document.querySelector('.rmd-editor')
+    fireEvent.change(textarea, { target: { value: '# New heading\n' } })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(([, opts]) => opts?.method === 'POST')
+      expect(postCall).toBeDefined()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    await screen.findByText('New heading')
+    expect(screen.queryByText(/quick brown fox/)).toBeNull()
   })
 })
 

@@ -185,4 +185,95 @@ describe('createHandler', () => {
       await close(vite.server)
     }
   })
+
+  it('POST /api/document writes content to disk', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: mdPath, markdown: '# Updated\n' }),
+      })
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ ok: true })
+      expect(await fsp.readFile(mdPath, 'utf8')).toBe('# Updated\n')
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('POST /api/document returns 400 for non-.md path', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    const txtPath = path.join(dir, 'doc.txt')
+    await fsp.writeFile(txtPath, 'hello')
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: txtPath, markdown: 'changed' }),
+      })
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/\.md/)
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('POST /api/document returns 400 for missing path or markdown', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: mdPath }),
+      })
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/Missing/)
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('POST /api/document returns 500 when file does not exist', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path.join(dir, 'nonexistent.md'), markdown: '# x' }),
+      })
+      expect(res.status).toBe(500)
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('POST /api/document returns 400 for invalid JSON body', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'not json',
+      })
+      expect(res.status).toBe(400)
+    } finally {
+      await close(server)
+    }
+  })
+
+  it('GET /api/document reflects content written by POST', async () => {
+    const { server, port } = await listen(createHandler({ dist }))
+    try {
+      await fetch(`http://127.0.0.1:${port}/api/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: mdPath, markdown: '# Written\n' }),
+      })
+      const res = await fetch(`http://127.0.0.1:${port}/api/document?path=${encodeURIComponent(mdPath)}`)
+      expect((await res.json()).markdown).toBe('# Written\n')
+    } finally {
+      await close(server)
+    }
+  })
 })
