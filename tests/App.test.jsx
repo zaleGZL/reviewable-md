@@ -69,6 +69,36 @@ afterEach(() => {
   delete global.fetch
 })
 
+// Minimal EventSource mock for SSE tests.
+class MockEventSource {
+  static instances = []
+  constructor(url) {
+    this.url = url
+    this.listeners = {}
+    this.closed = false
+    MockEventSource.instances.push(this)
+  }
+  addEventListener(type, handler) {
+    (this.listeners[type] ||= []).push(handler)
+  }
+  removeEventListener(type, handler) {
+    this.listeners[type] = (this.listeners[type] || []).filter((h) => h !== handler)
+  }
+  close() {
+    this.closed = true
+  }
+  emit(type, data) {
+    for (const h of this.listeners[type] || []) h({ data: JSON.stringify(data) })
+  }
+}
+beforeEach(() => {
+  MockEventSource.instances = []
+  global.EventSource = MockEventSource
+})
+afterEach(() => {
+  delete global.EventSource
+})
+
 describe('App loading and error states', () => {
   it('shows a loading indicator before data arrives', async () => {
     let resolve
@@ -668,5 +698,121 @@ describe('App path picker', () => {
 
     expect(await screen.findByText(/Please enter an absolute markdown file path/)).toBeInTheDocument()
     expect(fetchServerDocument).not.toHaveBeenCalled()
+  })
+})
+
+describe('App file watcher banner', () => {
+  it('shows the update banner when a file-changed SSE event arrives', async () => {
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    const es = MockEventSource.instances[0]
+    expect(es).toBeTruthy()
+    es.emit('file-changed', { path: 'spec.md' })
+
+    await screen.findByText('File has been updated on disk.')
+  })
+
+  it('refreshes the document when Refresh is clicked', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    const es = MockEventSource.instances[0]
+    es.emit('file-changed', { path: 'spec.md' })
+    await screen.findByText('File has been updated on disk.')
+
+    fetchServerDocument.mockResolvedValue({ ...DOC, markdown: '# Refreshed content\n' })
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await screen.findByText('Refreshed content')
+    expect(screen.queryByText('File has been updated on disk.')).toBeNull()
+  })
+
+  it('dismisses the banner without refreshing when Dismiss is clicked', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    const es = MockEventSource.instances[0]
+    es.emit('file-changed', { path: 'spec.md' })
+    await screen.findByText('File has been updated on disk.')
+
+    const fetchCallsBefore = fetchServerDocument.mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(screen.queryByText('File has been updated on disk.')).toBeNull()
+    expect(fetchServerDocument.mock.calls.length).toBe(fetchCallsBefore)
+  })
+
+  it('closes the old EventSource when the document changes', async () => {
+    const user = userEvent.setup()
+    const diskDoc = {
+      key: '/tmp/other.md',
+      path: '/tmp/other.md',
+      markdown: '# Other',
+      comments: [],
+    }
+    fetchServerDocument.mockResolvedValue(diskDoc)
+
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    const firstEs = MockEventSource.instances[0]
+    expect(firstEs.closed).toBe(false)
+
+    const pathInput = screen.getByLabelText('Markdown file path')
+    await user.clear(pathInput)
+    await user.type(pathInput, '/tmp/other.md')
+    await user.click(screen.getByRole('button', { name: 'Open path' }))
+
+    await screen.findByText('Other')
+    expect(firstEs.closed).toBe(true)
+    expect(MockEventSource.instances.length).toBe(2)
+  })
+})
+
+describe('App anchor drift detection', () => {
+  it('shows a Stale badge on a comment whose anchor text is gone', async () => {
+    loadLastDocument.mockResolvedValue({
+      ...DOC,
+      markdown: 'The quick brown fox jumps.',
+      comments: [
+        comment({ id: 'stale', body: 'Stale comment', anchor: { quote: 'no longer present', prefix: '', suffix: '' } }),
+        comment({ id: 'ok', body: 'Valid comment', anchor: { quote: 'quick brown', prefix: 'The ', suffix: ' fox' } }),
+      ],
+    })
+
+    render(<App />)
+    await screen.findByText('Stale comment')
+
+    // Wait for the highlight effect to run and orphanedIds to be set.
+    // The effect runs after render, and setOrphanedIds triggers a re-render
+    // with the badge. Use a longer timeout since the effect may need multiple
+    // render cycles to settle.
+    await waitFor(() => {
+      const staleCard = document.getElementById('card-stale')
+      expect(staleCard).toBeTruthy()
+      expect(staleCard.classList.contains('rmd-card-orphaned')).toBe(true)
+      expect(staleCard.querySelector('.rmd-orphaned-badge')).toBeTruthy()
+    }, { timeout: 5000 })
+
+    const okCard = document.getElementById('card-ok')
+    expect(okCard.querySelector('.rmd-orphaned-badge')).toBeNull()
+    expect(okCard.classList.contains('rmd-card-orphaned')).toBe(false)
+  })
+
+  it('does not show a Stale badge when the anchor text still exists', async () => {
+    loadLastDocument.mockResolvedValue({
+      ...DOC,
+      comments: [comment()],
+    })
+
+    render(<App />)
+    await screen.findByText('Clarify this.')
+
+    const card = document.querySelector('.rmd-card')
+    expect(card.querySelector('.rmd-orphaned-badge')).toBeNull()
+    expect(card.classList.contains('rmd-card-orphaned')).toBe(false)
   })
 })

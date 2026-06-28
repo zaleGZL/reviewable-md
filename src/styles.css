@@ -137,6 +137,15 @@
   background: var(--secondary);
 }
 
+.rmd-banner-update {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--secondary);
+}
+
 .rmd-header {
   position: sticky;
   top: 0;
@@ -520,6 +529,14 @@ mark.rmd-highlight.rmd-resolved {
 
 .rmd-card-resolved {
   opacity: 0.62;
+}
+
+.rmd-card.rmd-card-orphaned {
+  border-style: dashed;
+}
+
+.rmd-orphaned-badge {
+  margin-bottom: 8px;
 }
 
 .rmd-card.rmd-flash {

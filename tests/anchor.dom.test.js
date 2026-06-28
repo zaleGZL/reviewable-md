@@ -53,9 +53,9 @@ describe('selectionToAnchor', () => {
     const range = rangeForText(container, 'gamma')
     const anchor = selectionToAnchor(container, range)
     // Re-highlight using the anchor and confirm it wraps the right word.
-    const marks = highlightAnchors(container, [{ id: 'x', anchor }])
-    expect(marks.x).toBeTruthy()
-    expect(marks.x.textContent).toBe('gamma')
+    const result = highlightAnchors(container, [{ id: 'x', anchor }])
+    expect(result.elements.x).toBeTruthy()
+    expect(result.elements.x.textContent).toBe('gamma')
   })
 })
 
@@ -63,12 +63,12 @@ describe('highlightAnchors', () => {
   it('wraps the matched text in a <mark> with the comment id', () => {
     container.innerHTML = '<p>review this sentence please</p>'
     const anchor = { quote: 'this sentence', prefix: 'review ', suffix: ' please' }
-    const marks = highlightAnchors(container, [{ id: 'c42', anchor }])
+    const result = highlightAnchors(container, [{ id: 'c42', anchor }])
     const mark = container.querySelector('mark.rmd-highlight')
     expect(mark).toBeTruthy()
     expect(mark.dataset.commentId).toBe('c42')
     expect(mark.textContent).toBe('this sentence')
-    expect(marks.c42).toBe(mark)
+    expect(result.elements.c42).toBe(mark)
   })
 
   it('adds a resolved class for resolved comments', () => {
@@ -96,13 +96,13 @@ describe('highlightAnchors', () => {
     container.innerHTML =
       '<div class="rmd-mermaid"><svg><text>node</text></svg></div>' +
       '<p>connect each node carefully</p>'
-    const marks = highlightAnchors(container, [
+    const result = highlightAnchors(container, [
       { id: 'p', anchor: { quote: 'node', prefix: 'each ', suffix: ' carefully' } },
     ])
-    expect(marks.p).toBeTruthy()
+    expect(result.elements.p).toBeTruthy()
     // The highlight must live in the paragraph, not the SVG.
-    expect(marks.p.closest('svg')).toBeNull()
-    expect(marks.p.closest('p')).toBeTruthy()
+    expect(result.elements.p.closest('svg')).toBeNull()
+    expect(result.elements.p.closest('p')).toBeTruthy()
   })
 
   it('skips a highlight whose range crosses element boundaries', () => {
@@ -110,21 +110,24 @@ describe('highlightAnchors', () => {
     // the highlight is skipped — but other comments still apply and no error
     // escapes.
     container.innerHTML = '<p>the <em>quick</em> brown fox</p>'
-    const marks = highlightAnchors(container, [
+    const result = highlightAnchors(container, [
       { id: 'cross', anchor: { quote: 'quick brown' } },
       { id: 'ok', anchor: { quote: 'fox' } },
     ])
-    expect(marks.cross).toBeUndefined()
-    expect(marks.ok).toBeTruthy()
-    expect(marks.ok.textContent).toBe('fox')
+    expect(result.elements.cross).toBeUndefined()
+    // cross is not orphaned — the text exists but crosses element boundaries.
+    expect(result.orphanedIds.has('cross')).toBe(false)
+    expect(result.elements.ok).toBeTruthy()
+    expect(result.elements.ok.textContent).toBe('fox')
   })
 
   it('returns no element when the anchor text is gone', () => {
     container.innerHTML = '<p>the document changed entirely</p>'
-    const marks = highlightAnchors(container, [
+    const result = highlightAnchors(container, [
       { id: 'stale', anchor: { quote: 'no longer present' } },
     ])
-    expect(marks.stale).toBeUndefined()
+    expect(result.elements.stale).toBeUndefined()
+    expect(result.orphanedIds.has('stale')).toBe(true)
     expect(container.querySelector('mark.rmd-highlight')).toBeNull()
   })
 })

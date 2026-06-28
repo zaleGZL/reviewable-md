@@ -162,6 +162,44 @@ export function createHandler({ dev = false, dist, vitePort, port }) {
         return sendJson(res, 200, { ips: getLanIps(), port: port || DEFAULT_PORT })
       }
 
+      if (url.pathname === '/api/watch') {
+        if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' })
+        const rawPath = url.searchParams.get('path')
+        if (!rawPath) return sendJson(res, 400, { error: 'Missing path' })
+        const mdPath = path.resolve(rawPath)
+        if (!/\.md$/i.test(mdPath)) return sendJson(res, 400, { error: 'Only .md files are supported' })
+
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Connection': 'keep-alive',
+          'Cache-Control': 'no-cache',
+        })
+        res.flushHeaders()
+
+        let lastMtime = null
+        try {
+          const stat = await fsp.stat(mdPath)
+          lastMtime = stat.mtimeMs
+        } catch {
+          // File may not exist yet; we'll pick it up when it appears.
+        }
+
+        const interval = setInterval(async () => {
+          try {
+            const stat = await fsp.stat(mdPath)
+            if (lastMtime !== null && stat.mtimeMs > lastMtime) {
+              res.write(`event: file-changed\ndata: ${JSON.stringify({ path: mdPath, mtime: stat.mtimeMs })}\n\n`)
+            }
+            lastMtime = stat.mtimeMs
+          } catch {
+            // File deleted or inaccessible; skip this tick.
+          }
+        }, 1500)
+
+        req.on('close', () => clearInterval(interval))
+        return
+      }
+
       if (url.pathname.startsWith('/api/')) {
         return sendJson(res, 404, { error: 'Not found' })
       }

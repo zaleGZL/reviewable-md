@@ -127,20 +127,28 @@ function rangeFromChars(container, start, end) {
 }
 
 // Highlight all comment anchors in the container by wrapping matched ranges
-// in <mark> elements. Returns a map of commentId -> highlight element for
-// scroll/focus behavior.
+// in <mark> elements. Returns { elements, orphanedIds } where elements maps
+// commentId -> highlight element and orphanedIds is a Set of comment IDs whose
+// anchor text no longer exists in the rendered content.
 export function highlightAnchors(container, comments) {
   const { text } = buildTextIndex(container)
   const elements = {}
+  const orphanedIds = new Set()
 
-  // Sort by position so wrapping earlier ranges doesn't invalidate later ones;
-  // we re-resolve after each wrap by rebuilding the index per comment.
-  const located = comments
-    .map((c) => ({ c, pos: locateAnchor(text, c.anchor) }))
+  const located = comments.map((c) => ({ c, pos: locateAnchor(text, c.anchor) }))
+
+  // Collect orphaned: locateAnchor returned null (text truly gone).
+  for (const { c, pos } of located) {
+    if (!pos) orphanedIds.add(c.id)
+  }
+
+  // Sort valid ones by position so wrapping earlier ranges doesn't invalidate
+  // later ones; we re-resolve after each wrap by rebuilding the index per comment.
+  const valid = located
     .filter((x) => x.pos)
     .sort((a, b) => b.pos.start - a.pos.start) // wrap from the end backwards
 
-  for (const { c } of located) {
+  for (const { c } of valid) {
     const fresh = buildTextIndex(container)
     const pos = locateAnchor(fresh.text, c.anchor)
     if (!pos) continue
@@ -155,7 +163,8 @@ export function highlightAnchors(container, comments) {
       elements[c.id] = mark
     } catch {
       // Range crosses element boundaries; skip highlight but keep the comment.
+      // Not orphaned — the text exists, we just can't wrap it.
     }
   }
-  return elements
+  return { elements, orphanedIds }
 }

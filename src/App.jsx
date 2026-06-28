@@ -7,12 +7,14 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import './hljs-theme.css'
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   Copy,
   FileText,
   FolderOpen,
   MessageSquareText,
+  RefreshCw,
   Save,
   Trash2,
 } from 'lucide-react'
@@ -82,6 +84,8 @@ export default function App() {
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false)
   const [copiedSource, setCopiedSource] = useState(null)
   const [lanInfo, setLanInfo] = useState({ ips: [], port: null })
+  const [orphanedIds, setOrphanedIds] = useState(new Set())
+  const [fileUpdated, setFileUpdated] = useState(false)
   const contentRef = useRef(null)
   const editorRef = useRef(null)
 
@@ -133,18 +137,35 @@ export default function App() {
       return
     }
     try {
-      const freshDoc = await fetchServerDocument(trimmed)
-      const existing = await loadDocument(freshDoc.key)
-      const saved = await saveDocument(freshDoc, existing?.comments || [])
+      const saved = await loadDocFromServer(trimmed)
       const nextUrl = new URL(window.location.href)
-      nextUrl.searchParams.set('path', freshDoc.path)
+      nextUrl.searchParams.set('path', saved.path)
       window.history.replaceState(null, '', nextUrl)
-      setPathText(freshDoc.path)
+      setPathText(saved.path)
       setDoc(saved)
       setComments(saved.comments || [])
       setError(null)
       setDraft(null)
       setDraftText('')
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function loadDocFromServer(filePath) {
+    const freshDoc = await fetchServerDocument(filePath)
+    const existing = await loadDocument(freshDoc.key)
+    return await saveDocument(freshDoc, existing?.comments || [])
+  }
+
+  async function refreshFromDisk() {
+    if (!doc) return
+    try {
+      const saved = await loadDocFromServer(doc.path)
+      setDoc(saved)
+      setComments(saved.comments || [])
+      setFileUpdated(false)
+      setError(null)
     } catch (e) {
       setError(e.message)
     }
@@ -167,7 +188,8 @@ export default function App() {
       parent.removeChild(m)
       parent.normalize()
     })
-    highlightAnchors(container, comments)
+    const result = highlightAnchors(container, comments)
+    setOrphanedIds(result.orphanedIds)
 
     // Click a highlight -> scroll its comment card into view.
     const onClick = (e) => {
@@ -180,7 +202,7 @@ export default function App() {
     }
     container.addEventListener('click', onClick)
     return () => container.removeEventListener('click', onClick)
-  }, [comments, doc])
+  }, [comments, doc, mode, loading])
 
   // Capture a text selection inside the content to start a comment draft.
   function onMouseUp() {
@@ -271,6 +293,15 @@ export default function App() {
       setSaving(false)
     }
   }
+
+  // Watch for file changes on disk via SSE.
+  useEffect(() => {
+    if (!doc?.path) return
+    const es = new EventSource('/api/watch?path=' + encodeURIComponent(doc.path))
+    es.addEventListener('file-changed', () => setFileUpdated(true))
+    es.onerror = () => {}
+    return () => es.close()
+  }, [doc?.path])
 
   // Cmd+S / Ctrl+S saves in editor mode.
   useEffect(() => {
@@ -473,6 +504,18 @@ export default function App() {
           </Button>
         </form>
         {error && <div className="rmd-banner-error">Error: {error}</div>}
+        {fileUpdated && (
+          <div className="rmd-banner-update">
+            <span>File has been updated on disk.</span>
+            <Button size="sm" variant="outline" onClick={refreshFromDisk}>
+              <RefreshCw aria-hidden="true" />
+              Refresh
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setFileUpdated(false)}>
+              Dismiss
+            </Button>
+          </div>
+        )}
 
         <main className={cn('rmd-main', mode === 'edit' && 'rmd-main--editor')}>
           {mode === 'edit' ? (
@@ -512,9 +555,14 @@ export default function App() {
                   <Card
                     key={c.id}
                     id={'card-' + c.id}
-                    className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved')}
+                    className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved', orphanedIds.has(c.id) && 'rmd-card-orphaned')}
                   >
                     <CardContent className="px-4">
+                      {orphanedIds.has(c.id) && (
+                        <Badge variant="destructive" className="rmd-orphaned-badge">
+                          <AlertTriangle className="size-3" aria-hidden="true" /> Stale
+                        </Badge>
+                      )}
                       <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
                       {editingId === c.id ? (
                         <>

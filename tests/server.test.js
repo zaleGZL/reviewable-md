@@ -276,4 +276,93 @@ describe('createHandler', () => {
       await close(server)
     }
   })
+
+  describe('/api/watch SSE', () => {
+    function sseGet(port, filePath) {
+      return new Promise((resolve, reject) => {
+        const req = http.get(`http://127.0.0.1:${port}/api/watch?path=${encodeURIComponent(filePath)}`, (res) => {
+          resolve({ req, res })
+        })
+        req.on('error', reject)
+      })
+    }
+
+    it('returns text/event-stream content-type', async () => {
+      const { server, port } = await listen(createHandler({ dist }))
+      try {
+        const { req, res } = await sseGet(port, mdPath)
+        expect(res.statusCode).toBe(200)
+        expect(res.headers['content-type']).toBe('text/event-stream')
+        req.destroy()
+        await new Promise((r) => setTimeout(r, 100))
+      } finally {
+        await close(server)
+      }
+    })
+
+    it('pushes a file-changed event when the file is modified', async () => {
+      const { server, port } = await listen(createHandler({ dist }))
+      try {
+        const { req, res } = await sseGet(port, mdPath)
+        expect(res.statusCode).toBe(200)
+
+        let buffer = ''
+        let gotEvent = false
+        res.setEncoding('utf8')
+        res.on('data', (chunk) => {
+          buffer += chunk
+          if (buffer.includes('event: file-changed')) {
+            gotEvent = true
+          }
+        })
+
+        // Wait for the initial poll to record mtime, then modify the file.
+        await new Promise((r) => setTimeout(r, 200))
+        await fsp.writeFile(mdPath, '# Changed content\n')
+
+        // Wait for the next poll cycle to detect the change.
+        await new Promise((r) => setTimeout(r, 2000))
+        expect(gotEvent).toBe(true)
+        req.destroy()
+        await new Promise((r) => setTimeout(r, 100))
+      } finally {
+        await close(server)
+      }
+    }, 10000)
+
+    it('returns 405 for non-GET methods', async () => {
+      const { server, port } = await listen(createHandler({ dist }))
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/watch?path=${encodeURIComponent(mdPath)}`, {
+          method: 'POST',
+        })
+        expect(res.status).toBe(405)
+        expect((await res.json()).error).toMatch(/Method/)
+      } finally {
+        await close(server)
+      }
+    })
+
+    it('returns 400 for missing path', async () => {
+      const { server, port } = await listen(createHandler({ dist }))
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/watch`)
+        expect(res.status).toBe(400)
+        expect((await res.json()).error).toMatch(/Missing/)
+      } finally {
+        await close(server)
+      }
+    })
+
+    it('returns 400 for non-.md path', async () => {
+      const { server, port } = await listen(createHandler({ dist }))
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/watch?path=${encodeURIComponent(path.join(dir, 'doc.txt'))}`)
+        expect(res.status).toBe(400)
+        expect((await res.json()).error).toMatch(/\.md/)
+      } finally {
+        await close(server)
+      }
+    })
+  })
 })
