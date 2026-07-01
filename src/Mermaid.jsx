@@ -5,21 +5,105 @@ import { Button } from '@/components/ui/button'
 
 let counter = 0
 
+function readVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+function buildThemeVariables() {
+  const background = readVar('--background')
+  const foreground = readVar('--foreground')
+  const primary = readVar('--primary')
+  const primaryForeground = readVar('--primary-foreground')
+  const secondary = readVar('--secondary')
+  const muted = readVar('--muted')
+  const border = readVar('--border')
+  return {
+    background,
+    primaryColor: secondary,
+    primaryTextColor: foreground,
+    primaryBorderColor: border,
+    secondaryColor: muted,
+    tertiaryColor: muted,
+    lineColor: border,
+    textColor: foreground,
+    mainBkg: secondary,
+    nodeBorder: border,
+    clusterBkg: muted,
+    clusterBorder: border,
+    edgeLabelBackground: background,
+    actorBkg: secondary,
+    actorBorder: border,
+    actorTextColor: foreground,
+    signalColor: foreground,
+    signalTextColor: foreground,
+    labelBoxBkgColor: secondary,
+    labelBoxBorderColor: border,
+    labelTextColor: foreground,
+    noteBkgColor: muted,
+    noteBorderColor: border,
+    noteTextColor: foreground,
+    titleColor: foreground,
+    fontFamily: 'inherit',
+    darkMode: document.documentElement.getAttribute('data-mode') === 'dark',
+    primaryColorInverted: primaryForeground,
+    // Kept for palette consistency even though not all diagram types read it.
+    accentColor: primary,
+  }
+}
+
 // Load mermaid lazily so documents without diagrams don't pay for its bundle.
 let mermaidPromise = null
 function getMermaid() {
   if (!mermaidPromise) {
     mermaidPromise = import('mermaid').then(({ default: mermaid }) => {
-      const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
       mermaid.initialize({
         startOnLoad: false,
-        theme: dark ? 'dark' : 'default',
+        theme: 'base',
+        themeVariables: buildThemeVariables(),
         securityLevel: 'strict',
       })
       return mermaid
     })
   }
   return mermaidPromise
+}
+
+function reinitMermaid() {
+  if (!mermaidPromise) return Promise.resolve()
+  return mermaidPromise.then((mermaid) => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      themeVariables: buildThemeVariables(),
+      securityLevel: 'strict',
+    })
+  })
+}
+
+// Single shared observer + pub/sub so N mounted diagrams don't each register
+// their own MutationObserver on document.documentElement.
+const themeChangeListeners = new Set()
+let themeObserver = null
+function subscribeThemeChange(listener) {
+  themeChangeListeners.add(listener)
+  if (!themeObserver) {
+    themeObserver = new MutationObserver(() => {
+      reinitMermaid().then(() => {
+        themeChangeListeners.forEach((fn) => fn())
+      })
+    })
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-mode'],
+    })
+  }
+  return () => {
+    themeChangeListeners.delete(listener)
+    if (themeChangeListeners.size === 0 && themeObserver) {
+      themeObserver.disconnect()
+      themeObserver = null
+    }
+  }
 }
 
 // Renders a ```mermaid code block as an SVG diagram. Falls back to showing the
@@ -30,6 +114,9 @@ export default function Mermaid({ code }) {
   const [svg, setSvg] = useState('')
   const [expanded, setExpanded] = useState(false)
   const [zoom, setZoom] = useState(1)
+  const [themeVersion, setThemeVersion] = useState(0)
+
+  useEffect(() => subscribeThemeChange(() => setThemeVersion((v) => v + 1)), [])
 
   useEffect(() => {
     let cancelled = false
@@ -47,7 +134,7 @@ export default function Mermaid({ code }) {
     return () => {
       cancelled = true
     }
-  }, [code])
+  }, [code, themeVersion])
 
   useEffect(() => {
     if (!expanded) return

@@ -1,21 +1,41 @@
 import { useState, useEffect } from 'react'
-import { Check, Laptop, Moon, Sun } from 'lucide-react'
+import { Check, Laptop, Moon, Palette, Sun } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
+const THEME_MODE = {
+  'github-light': 'light',
+  'github-dark': 'dark',
+  nord: 'dark',
+  dracula: 'dark',
+  'solarized-light': 'light',
+  'solarized-dark': 'dark',
+}
+
 const THEMES = [
-  { key: 'light', label: 'Light', Icon: Sun },
-  { key: 'dark', label: 'Dark', Icon: Moon },
   { key: 'system', label: 'System', Icon: Laptop },
+  { key: 'github-light', label: 'GitHub Light', Icon: Sun },
+  { key: 'github-dark', label: 'GitHub Dark', Icon: Moon },
+  { key: 'nord', label: 'Nord', Icon: Palette },
+  { key: 'dracula', label: 'Dracula', Icon: Palette },
+  { key: 'solarized-light', label: 'Solarized Light', Icon: Sun },
+  { key: 'solarized-dark', label: 'Solarized Dark', Icon: Moon },
 ]
+
 function getSystemDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+function resolveTheme(mode) {
+  if (mode === 'system') return getSystemDark() ? 'github-dark' : 'github-light'
+  return mode
+}
+
 function applyTheme(mode) {
-  const dark = mode === 'dark' || (mode === 'system' && getSystemDark())
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  const theme = resolveTheme(mode)
+  document.documentElement.setAttribute('data-theme', theme)
+  document.documentElement.setAttribute('data-mode', THEME_MODE[theme])
 }
 
 export default function ThemeToggle() {
@@ -50,7 +70,7 @@ export default function ThemeToggle() {
           <CurrentIcon aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-36">
+      <DropdownMenuContent align="end" className="w-44">
         {THEMES.map((t) => {
           const Icon = t.Icon
           return (

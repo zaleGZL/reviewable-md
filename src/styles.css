@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -51,9 +51,62 @@
   --highlight: #fff8c5;
   --highlight-resolved: #eaeef2;
   --sidebar-w: 340px;
+  --hljs-bg: #ffffff;
+  --hljs-fg: #24292e;
+  --hljs-comment: #6a737d;
+  --hljs-keyword: #d73a49;
+  --hljs-entity: #6f42c1;
+  --hljs-constant: #005cc5;
+  --hljs-string: #032f62;
+  --hljs-variable: #e36209;
+  --hljs-tag: #22863a;
+  --hljs-heading: #005cc5;
+  --hljs-bullet: #735c0f;
+  --hljs-addition-fg: #22863a;
+  --hljs-addition-bg: #f0fff4;
+  --hljs-deletion-fg: #b31d28;
+  --hljs-deletion-bg: #ffeef0;
 }
 
-[data-theme="dark"] {
+[data-theme="github-light"] {
+  --background: #ffffff;
+  --foreground: #1f2328;
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+  --primary: #0969da;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f8fa;
+  --secondary-foreground: #1f2328;
+  --muted: #f6f8fa;
+  --muted-foreground: #656d76;
+  --accent: #f6f8fa;
+  --accent-foreground: #1f2328;
+  --destructive: #cf222e;
+  --border: #d0d7de;
+  --input: #d0d7de;
+  --ring: #0969da;
+  --highlight: #fff8c5;
+  --highlight-resolved: #eaeef2;
+  --hljs-bg: #ffffff;
+  --hljs-fg: #24292e;
+  --hljs-comment: #6a737d;
+  --hljs-keyword: #d73a49;
+  --hljs-entity: #6f42c1;
+  --hljs-constant: #005cc5;
+  --hljs-string: #032f62;
+  --hljs-variable: #e36209;
+  --hljs-tag: #22863a;
+  --hljs-heading: #005cc5;
+  --hljs-bullet: #735c0f;
+  --hljs-addition-fg: #22863a;
+  --hljs-addition-bg: #f0fff4;
+  --hljs-deletion-fg: #b31d28;
+  --hljs-deletion-bg: #ffeef0;
+}
+
+[data-theme="github-dark"] {
   --background: #0d1117;
   --foreground: #e6edf3;
   --card: #161b22;
@@ -74,6 +127,173 @@
   --ring: #2f81f7;
   --highlight: #5a4a00;
   --highlight-resolved: #21262d;
+  --hljs-bg: #0d1117;
+  --hljs-fg: #c9d1d9;
+  --hljs-comment: #8b949e;
+  --hljs-keyword: #ff7b72;
+  --hljs-entity: #d2a8ff;
+  --hljs-constant: #79c0ff;
+  --hljs-string: #a5d6ff;
+  --hljs-variable: #ffa657;
+  --hljs-tag: #7ee787;
+  --hljs-heading: #1f6feb;
+  --hljs-bullet: #f2cc60;
+  --hljs-addition-fg: #aff5b4;
+  --hljs-addition-bg: #033a16;
+  --hljs-deletion-fg: #ffdcd7;
+  --hljs-deletion-bg: #67060c;
+}
+
+[data-theme="nord"] {
+  --background: #2e3440;
+  --foreground: #eceff4;
+  --card: #3b4252;
+  --card-foreground: #eceff4;
+  --popover: #3b4252;
+  --popover-foreground: #eceff4;
+  --primary: #88c0d0;
+  --primary-foreground: #2e3440;
+  --secondary: #3b4252;
+  --secondary-foreground: #eceff4;
+  --muted: #434c5e;
+  --muted-foreground: #d8dee9;
+  --accent: #434c5e;
+  --accent-foreground: #eceff4;
+  --destructive: #bf616a;
+  --border: #4c566a;
+  --input: #4c566a;
+  --ring: #88c0d0;
+  --highlight: #ebcb8b;
+  --highlight-resolved: #434c5e;
+  --hljs-bg: #2e3440;
+  --hljs-fg: #d8dee9;
+  --hljs-comment: #616e88;
+  --hljs-keyword: #81a1c1;
+  --hljs-entity: #8fbcbb;
+  --hljs-constant: #d08770;
+  --hljs-string: #a3be8c;
+  --hljs-variable: #d08770;
+  --hljs-tag: #a3be8c;
+  --hljs-heading: #5e81ac;
+  --hljs-bullet: #ebcb8b;
+  --hljs-addition-fg: #a3be8c;
+  --hljs-addition-bg: #3b4252;
+  --hljs-deletion-fg: #bf616a;
+  --hljs-deletion-bg: #3b4252;
+}
+
+[data-theme="dracula"] {
+  --background: #282a36;
+  --foreground: #f8f8f2;
+  --card: #343746;
+  --card-foreground: #f8f8f2;
+  --popover: #343746;
+  --popover-foreground: #f8f8f2;
+  --primary: #bd93f9;
+  --primary-foreground: #282a36;
+  --secondary: #44475a;
+  --secondary-foreground: #f8f8f2;
+  --muted: #44475a;
+  --muted-foreground: #bfbfda;
+  --accent: #44475a;
+  --accent-foreground: #f8f8f2;
+  --destructive: #ff5555;
+  --border: #6272a4;
+  --input: #6272a4;
+  --ring: #bd93f9;
+  --highlight: #f1fa8c;
+  --highlight-resolved: #44475a;
+  --hljs-bg: #282a36;
+  --hljs-fg: #f8f8f2;
+  --hljs-comment: #6272a4;
+  --hljs-keyword: #ff79c6;
+  --hljs-entity: #50fa7b;
+  --hljs-constant: #bd93f9;
+  --hljs-string: #f1fa8c;
+  --hljs-variable: #ffb86c;
+  --hljs-tag: #8be9fd;
+  --hljs-heading: #bd93f9;
+  --hljs-bullet: #f1fa8c;
+  --hljs-addition-fg: #50fa7b;
+  --hljs-addition-bg: #313947;
+  --hljs-deletion-fg: #ff5555;
+  --hljs-deletion-bg: #3a2f3a;
+}
+
+[data-theme="solarized-light"] {
+  --background: #fdf6e3;
+  --foreground: #073642;
+  --card: #eee8d5;
+  --card-foreground: #073642;
+  --popover: #eee8d5;
+  --popover-foreground: #073642;
+  --primary: #268bd2;
+  --primary-foreground: #fdf6e3;
+  --secondary: #eee8d5;
+  --secondary-foreground: #586e75;
+  --muted: #eee8d5;
+  --muted-foreground: #657b83;
+  --accent: #eee8d5;
+  --accent-foreground: #073642;
+  --destructive: #dc322f;
+  --border: #93a1a1;
+  --input: #93a1a1;
+  --ring: #268bd2;
+  --highlight: #b58900;
+  --highlight-resolved: #eee8d5;
+  --hljs-bg: #fdf6e3;
+  --hljs-fg: #657b83;
+  --hljs-comment: #93a1a1;
+  --hljs-keyword: #859900;
+  --hljs-entity: #268bd2;
+  --hljs-constant: #cb4b16;
+  --hljs-string: #2aa198;
+  --hljs-variable: #b58900;
+  --hljs-tag: #268bd2;
+  --hljs-heading: #268bd2;
+  --hljs-bullet: #b58900;
+  --hljs-addition-fg: #859900;
+  --hljs-addition-bg: #eee8d5;
+  --hljs-deletion-fg: #dc322f;
+  --hljs-deletion-bg: #eee8d5;
+}
+
+[data-theme="solarized-dark"] {
+  --background: #002b36;
+  --foreground: #93a1a1;
+  --card: #073642;
+  --card-foreground: #93a1a1;
+  --popover: #073642;
+  --popover-foreground: #93a1a1;
+  --primary: #268bd2;
+  --primary-foreground: #002b36;
+  --secondary: #073642;
+  --secondary-foreground: #93a1a1;
+  --muted: #073642;
+  --muted-foreground: #839496;
+  --accent: #073642;
+  --accent-foreground: #93a1a1;
+  --destructive: #dc322f;
+  --border: #586e75;
+  --input: #586e75;
+  --ring: #268bd2;
+  --highlight: #b58900;
+  --highlight-resolved: #073642;
+  --hljs-bg: #002b36;
+  --hljs-fg: #839496;
+  --hljs-comment: #586e75;
+  --hljs-keyword: #859900;
+  --hljs-entity: #268bd2;
+  --hljs-constant: #cb4b16;
+  --hljs-string: #2aa198;
+  --hljs-variable: #b58900;
+  --hljs-tag: #268bd2;
+  --hljs-heading: #268bd2;
+  --hljs-bullet: #b58900;
+  --hljs-addition-fg: #859900;
+  --hljs-addition-bg: #073642;
+  --hljs-deletion-fg: #dc322f;
+  --hljs-deletion-bg: #073642;
 }
 
 @layer base {
