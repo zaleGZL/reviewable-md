@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
+  Columns2,
   Copy,
   FileText,
   FolderOpen,
@@ -24,6 +25,7 @@ import {
   loadLastDocument,
   saveDocument,
   saveComments,
+  saveLayout,
 } from './storage'
 import { selectionToAnchor, highlightAnchors } from './anchor'
 import { buildAiPrompt } from './aiText'
@@ -86,6 +88,7 @@ export default function App() {
   const [lanInfo, setLanInfo] = useState({ ips: [], port: null })
   const [orphanedIds, setOrphanedIds] = useState(new Set())
   const [fileUpdated, setFileUpdated] = useState(false)
+  const [fullWidth, setFullWidth] = useState(false)
   const contentRef = useRef(null)
   const editorRef = useRef(null)
 
@@ -103,7 +106,7 @@ export default function App() {
       if (filePath) {
         const freshDoc = await fetchServerDocument(filePath)
         const existing = await loadDocument(freshDoc.key)
-        const saved = await saveDocument(freshDoc, existing?.comments || [])
+        const saved = await saveDocument({ ...freshDoc, layout: existing?.layout }, existing?.comments || [])
         setDoc(saved)
         setComments(saved.comments || [])
         return
@@ -123,12 +126,25 @@ export default function App() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Full-width preference is stored per document; re-derive it whenever the
+  // open document changes rather than carrying it across documents.
+  useEffect(() => {
+    setFullWidth(Boolean(doc?.layout?.fullWidth))
+  }, [doc?.key])
+
   // Persist comments whenever they change (after initial load).
   const persist = useCallback((next) => {
     if (!doc) return
     setComments(next)
     saveComments(doc.key, next).catch((e) => setError(e.message))
   }, [doc])
+
+  function toggleFullWidth() {
+    if (!doc) return
+    const next = !fullWidth
+    setFullWidth(next)
+    saveLayout(doc.key, { fullWidth: next }).catch((e) => setError(e.message))
+  }
 
   async function openServerPath(filePath) {
     const trimmed = filePath.trim()
@@ -155,7 +171,7 @@ export default function App() {
   async function loadDocFromServer(filePath) {
     const freshDoc = await fetchServerDocument(filePath)
     const existing = await loadDocument(freshDoc.key)
-    return await saveDocument(freshDoc, existing?.comments || [])
+    return await saveDocument({ ...freshDoc, layout: existing?.layout }, existing?.comments || [])
   }
 
   async function refreshFromDisk() {
@@ -439,6 +455,22 @@ export default function App() {
             <Badge variant="secondary" className="hidden sm:inline-flex">
               {open.length} open / {comments.length} total
             </Badge>
+            {mode === 'view' && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={fullWidth ? 'default' : 'outline'}
+                    size="icon"
+                    aria-label="Toggle full-width content"
+                    aria-pressed={fullWidth}
+                    onClick={toggleFullWidth}
+                  >
+                    <Columns2 aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{fullWidth ? 'Disable full width' : 'Enable full width'}</TooltipContent>
+              </Tooltip>
+            )}
             <ThemeToggle />
             <AlertDialog>
               <Tooltip>
@@ -517,7 +549,7 @@ export default function App() {
           </div>
         )}
 
-        <main className={cn('rmd-main', mode === 'edit' && 'rmd-main--editor')}>
+        <main className={cn('rmd-main', mode === 'edit' && 'rmd-main--editor', mode === 'view' && fullWidth && 'rmd-main--full')}>
           {mode === 'edit' ? (
             <textarea
               ref={editorRef}

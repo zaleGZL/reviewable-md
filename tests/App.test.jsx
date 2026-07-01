@@ -9,12 +9,14 @@ const loadLastDocument = vi.fn()
 const fetchServerDocument = vi.fn()
 const saveDocument = vi.fn()
 const saveComments = vi.fn()
+const saveLayout = vi.fn()
 vi.mock('../src/storage.js', () => ({
   fetchServerDocument: (...a) => fetchServerDocument(...a),
   loadDocument: (...a) => loadDocument(...a),
   loadLastDocument: (...a) => loadLastDocument(...a),
   saveDocument: (...a) => saveDocument(...a),
   saveComments: (...a) => saveComments(...a),
+  saveLayout: (...a) => saveLayout(...a),
 }))
 
 import App from '../src/App.jsx'
@@ -61,6 +63,7 @@ beforeEach(() => {
   loadLastDocument.mockReset().mockResolvedValue(DOC)
   saveDocument.mockReset().mockImplementation(async (doc, comments = []) => ({ ...doc, comments }))
   saveComments.mockReset().mockResolvedValue({ ok: true })
+  saveLayout.mockReset().mockResolvedValue({ ok: true })
   // Stub global fetch for network-info (called on mount) and any POST saves.
   global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ips: [], port: null }) })
 })
@@ -639,6 +642,42 @@ describe('App editor mode', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }))
     await screen.findByText('New heading')
     expect(screen.queryByText(/quick brown fox/)).toBeNull()
+  })
+})
+
+describe('App full-width toggle', () => {
+  it('is off by default and only shown in Preview mode', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    const toggle = screen.getByRole('button', { name: 'Toggle full-width content' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(document.querySelector('.rmd-main')).not.toHaveClass('rmd-main--full')
+
+    await user.click(screen.getByRole('button', { name: 'Editor' }))
+    expect(screen.queryByRole('button', { name: 'Toggle full-width content' })).toBeNull()
+  })
+
+  it('toggles full width and persists the preference for the current document', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    await user.click(screen.getByRole('button', { name: 'Toggle full-width content' }))
+
+    expect(document.querySelector('.rmd-main')).toHaveClass('rmd-main--full')
+    expect(saveLayout).toHaveBeenCalledWith('spec.md', { fullWidth: true })
+  })
+
+  it('restores a previously saved full-width preference for the document', async () => {
+    loadLastDocument.mockResolvedValue({ ...DOC, layout: { fullWidth: true } })
+    render(<App />)
+    await screen.findByText(/spec\.md/)
+
+    const toggle = screen.getByRole('button', { name: 'Toggle full-width content' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(document.querySelector('.rmd-main')).toHaveClass('rmd-main--full')
   })
 })
 

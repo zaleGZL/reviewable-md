@@ -85,6 +85,7 @@ export async function loadDocument(key) {
     markdown: record.markdown,
     fileMeta: record.fileMeta,
     comments: Array.isArray(record.comments) ? record.comments : [],
+    layout: record.layout || null,
   }
 }
 
@@ -95,6 +96,7 @@ export async function saveDocument(doc, comments = []) {
     markdown: doc.markdown,
     fileMeta: doc.fileMeta || null,
     comments,
+    layout: doc.layout || null,
     updatedAt: new Date().toISOString(),
   }
   await runStore('readwrite', (store) => {
@@ -109,4 +111,10 @@ export async function saveComments(docKey, comments) {
   if (!existing) throw new Error('No document is loaded')
   await saveDocument(existing, comments)
   return { ok: true }
+}
+
+export async function saveLayout(docKey, layout) {
+  const existing = await loadDocument(docKey)
+  if (!existing) throw new Error('No document is loaded')
+  return await saveDocument({ ...existing, layout }, existing.comments || [])
 }

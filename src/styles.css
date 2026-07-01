@@ -199,6 +199,10 @@
   max-width: none;
 }
 
+.rmd-main--full {
+  max-width: none;
+}
+
 .rmd-editor {
   display: block;
   width: 100%;

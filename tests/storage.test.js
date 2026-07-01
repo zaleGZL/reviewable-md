@@ -7,6 +7,7 @@ import {
   loadLastDocument,
   saveComments,
   saveDocument,
+  saveLayout,
 } from '../src/storage.js'
 
 function deleteDb(name) {
@@ -105,5 +106,19 @@ describe('document storage', () => {
 
   it('rejects comment saves when the document is missing', async () => {
     await expect(saveComments('missing.md', [])).rejects.toThrow('No document is loaded')
+  })
+
+  it('persists a layout preference independently per document', async () => {
+    await saveDocument({ key: 'a.md', path: 'a.md', markdown: '# A' }, [])
+    await saveDocument({ key: 'b.md', path: 'b.md', markdown: '# B' }, [])
+
+    await saveLayout('a.md', { fullWidth: true })
+
+    expect((await loadDocument('a.md')).layout).toEqual({ fullWidth: true })
+    expect((await loadDocument('b.md')).layout).toBeNull()
+  })
+
+  it('rejects layout saves when the document is missing', async () => {
+    await expect(saveLayout('missing.md', { fullWidth: true })).rejects.toThrow('No document is loaded')
   })
 })
