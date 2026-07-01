@@ -89,6 +89,7 @@ export default function App() {
   const [orphanedIds, setOrphanedIds] = useState(new Set())
   const [fileUpdated, setFileUpdated] = useState(false)
   const [fullWidth, setFullWidth] = useState(false)
+  const [commentsCollapsed, setCommentsCollapsed] = useState(false)
   const contentRef = useRef(null)
   const editorRef = useRef(null)
   const draftRef = useRef(null)
@@ -565,7 +566,7 @@ export default function App() {
           </div>
         )}
 
-        <main className={cn('rmd-main', mode === 'edit' && 'rmd-main--editor', mode === 'view' && fullWidth && 'rmd-main--full')}>
+        <main className={cn('rmd-main', mode === 'edit' && 'rmd-main--editor', mode === 'view' && fullWidth && 'rmd-main--full', mode === 'view' && commentsCollapsed && 'rmd-main--comments-collapsed')}>
           {mode === 'edit' ? (
             <textarea
               ref={editorRef}
@@ -591,66 +592,79 @@ export default function App() {
           )}
 
           {mode === 'view' && (
-            <aside className="rmd-sidebar">
+            <aside className={cn('rmd-sidebar', commentsCollapsed && 'rmd-sidebar--collapsed')}>
               <div className="rmd-sidebar-header">
-                <h2>Comments</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rmd-sidebar-toggle"
+                  aria-expanded={!commentsCollapsed}
+                  onClick={() => setCommentsCollapsed((v) => !v)}
+                >
+                  <ChevronDown className={cn('rmd-collapse-icon', commentsCollapsed && 'rmd-collapse-icon--collapsed')} aria-hidden="true" />
+                  <h2>Comments</h2>
+                </Button>
               </div>
-              {comments.length === 0 && (
-                <p className="rmd-hint">Select any text in the document to add a comment.</p>
+              {!commentsCollapsed && (
+                <>
+                  {comments.length === 0 && (
+                    <p className="rmd-hint">Select any text in the document to add a comment.</p>
+                  )}
+                  <div className="grid gap-3">
+                    {comments.map((c) => (
+                      <Card
+                        key={c.id}
+                        id={'card-' + c.id}
+                        className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved', orphanedIds.has(c.id) && 'rmd-card-orphaned')}
+                      >
+                        <CardContent className="px-4">
+                          {orphanedIds.has(c.id) && (
+                            <Badge variant="destructive" className="rmd-orphaned-badge">
+                              <AlertTriangle className="size-3" aria-hidden="true" /> Stale
+                            </Badge>
+                          )}
+                          <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
+                          {editingId === c.id ? (
+                            <>
+                              <Textarea
+                                autoFocus
+                                value={editingText}
+                                className="mb-3 min-h-20 resize-y"
+                                onChange={(e) => setEditingText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEditComment(c.id)
+                                  if (e.key === 'Escape') cancelEditComment()
+                                }}
+                              />
+                              <div className="rmd-card-actions">
+                                <Button size="sm" onClick={() => saveEditComment(c.id)}>Save</Button>
+                                <Button variant="outline" size="sm" onClick={cancelEditComment}>Cancel</Button>
+                                <span className="rmd-kbd">Cmd+Enter</span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="rmd-body">{c.body}</p>
+                              <Separator className="my-3" />
+                              <div className="rmd-card-actions">
+                                <Button variant="outline" size="sm" onClick={() => toggleResolved(c.id)}>
+                                  {c.resolved ? 'Reopen' : 'Resolve'}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => startEditComment(c)}>
+                                  Edit
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => deleteComment(c.id)}>
+                                  Delete
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
-              <div className="grid gap-3">
-                {comments.map((c) => (
-                  <Card
-                    key={c.id}
-                    id={'card-' + c.id}
-                    className={cn('rmd-card gap-3 py-4', c.resolved && 'rmd-card-resolved', orphanedIds.has(c.id) && 'rmd-card-orphaned')}
-                  >
-                    <CardContent className="px-4">
-                      {orphanedIds.has(c.id) && (
-                        <Badge variant="destructive" className="rmd-orphaned-badge">
-                          <AlertTriangle className="size-3" aria-hidden="true" /> Stale
-                        </Badge>
-                      )}
-                      <blockquote className="rmd-quote">{c.anchor.quote}</blockquote>
-                      {editingId === c.id ? (
-                        <>
-                          <Textarea
-                            autoFocus
-                            value={editingText}
-                            className="mb-3 min-h-20 resize-y"
-                            onChange={(e) => setEditingText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEditComment(c.id)
-                              if (e.key === 'Escape') cancelEditComment()
-                            }}
-                          />
-                          <div className="rmd-card-actions">
-                            <Button size="sm" onClick={() => saveEditComment(c.id)}>Save</Button>
-                            <Button variant="outline" size="sm" onClick={cancelEditComment}>Cancel</Button>
-                            <span className="rmd-kbd">Cmd+Enter</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="rmd-body">{c.body}</p>
-                          <Separator className="my-3" />
-                          <div className="rmd-card-actions">
-                            <Button variant="outline" size="sm" onClick={() => toggleResolved(c.id)}>
-                              {c.resolved ? 'Reopen' : 'Resolve'}
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => startEditComment(c)}>
-                              Edit
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => deleteComment(c.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
             </aside>
           )}
         </main>

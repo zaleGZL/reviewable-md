@@ -203,6 +203,10 @@
   max-width: none;
 }
 
+.rmd-main--comments-collapsed {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .rmd-editor {
   display: block;
   width: 100%;
@@ -503,7 +507,10 @@ mark.rmd-highlight.rmd-resolved {
   top: 70px;
   max-height: calc(100vh - 90px);
   overflow-y: auto;
-  padding-right: 2px;
+  padding: 16px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .rmd-sidebar h2 {
@@ -517,9 +524,27 @@ mark.rmd-highlight.rmd-resolved {
 .rmd-sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 12px;
+}
+
+.rmd-sidebar--collapsed .rmd-sidebar-header {
+  margin-bottom: 0;
+}
+
+.rmd-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  height: auto;
+}
+
+.rmd-collapse-icon {
+  transition: transform 0.15s ease;
+}
+
+.rmd-collapse-icon--collapsed {
+  transform: rotate(-90deg);
 }
 
 .rmd-hint {
