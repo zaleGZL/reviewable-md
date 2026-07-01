@@ -3,7 +3,7 @@ import os from 'node:os'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 
-export const DEFAULT_PORT = 27174
+export const DEFAULT_PORT = 28174
 
 export function getLanIps() {
   const ifaces = os.networkInterfaces()

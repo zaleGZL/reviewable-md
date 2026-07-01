@@ -13,7 +13,7 @@ All UI text, comments, labels, and documentation in this project are in **Englis
 ## Commands
 
 ```bash
-npm run dev                   # dev: Node server + Vite (HMR), default page at :27175
+npm run dev                   # dev: Node server + Vite (HMR), default page at :28175
 npm run dev -- <file.md>      # dev: open file and persist its absolute path in URL
 npm run build                 # build client to dist/
 npm run preview               # preview built client through server/cli.js

@@ -39,7 +39,7 @@ skill 文件会写入：
 
 ```bash
 npm install --registry=https://npm.shopee.io/ @foody/reviewable-md
-npm run dev                    # 在 http://localhost:27175 打开默认页面
+npm run dev                    # 在 http://localhost:28175 打开默认页面
 npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
 ```
 
@@ -47,7 +47,7 @@ npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
 
 ```bash
 npm install reviewable-md
-npm run dev                    # 在 http://localhost:27175 打开默认页面
+npm run dev                    # 在 http://localhost:28175 打开默认页面
 npm run dev -- sample.md       # 打开 sample.md 并将路径持久化到 URL
 ```
 

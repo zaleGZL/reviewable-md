@@ -91,6 +91,7 @@ export default function App() {
   const [fullWidth, setFullWidth] = useState(false)
   const contentRef = useRef(null)
   const editorRef = useRef(null)
+  const draftRef = useRef(null)
 
   useEffect(() => {
     fetch('/api/network-info')
@@ -219,6 +220,21 @@ export default function App() {
     container.addEventListener('click', onClick)
     return () => container.removeEventListener('click', onClick)
   }, [comments, doc, mode, loading])
+
+  // Clicking outside the draft card dismisses it, but only while it's still
+  // empty — once the user has typed something, force an explicit Cancel so
+  // an accidental outside click can't silently discard the comment.
+  useEffect(() => {
+    if (!draft) return
+    function onPointerDown(e) {
+      if (draftText.trim()) return
+      if (draftRef.current?.contains(e.target)) return
+      setDraft(null)
+      setDraftText('')
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [draft, draftText])
 
   // Capture a text selection inside the content to start a comment draft.
   function onMouseUp() {
@@ -640,27 +656,29 @@ export default function App() {
         </main>
 
         {draft && (
-          <Card className="rmd-draft gap-3 py-4" style={{ top: draft.top }}>
-            <CardContent className="px-4">
-              <blockquote className="rmd-quote">{draft.anchor.quote}</blockquote>
-              <Textarea
-                autoFocus
-                value={draftText}
-                placeholder="Write a comment..."
-                className="mb-3 min-h-24 resize-y"
-                onChange={(e) => setDraftText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addComment()
-                  if (e.key === 'Escape') setDraft(null)
-                }}
-              />
-              <div className="rmd-draft-actions">
-                <Button onClick={addComment}>Comment</Button>
-                <Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
-                <span className="rmd-kbd">Cmd+Enter</span>
-              </div>
-            </CardContent>
-          </Card>
+          <div ref={draftRef}>
+            <Card className="rmd-draft gap-3 py-4" style={{ top: draft.top }}>
+              <CardContent className="px-4">
+                <blockquote className="rmd-quote">{draft.anchor.quote}</blockquote>
+                <Textarea
+                  autoFocus
+                  value={draftText}
+                  placeholder="Write a comment..."
+                  className="mb-3 min-h-24 resize-y"
+                  onChange={(e) => setDraftText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addComment()
+                    if (e.key === 'Escape') setDraft(null)
+                  }}
+                />
+                <div className="rmd-draft-actions">
+                  <Button onClick={addComment}>Comment</Button>
+                  <Button variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+                  <span className="rmd-kbd">Cmd+Enter</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </TooltipProvider>

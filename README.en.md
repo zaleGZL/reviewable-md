@@ -12,7 +12,7 @@ Comments are saved locally in the browser and survive page refreshes. When a doc
 
 ```bash
 npm install --registry=https://npm.shopee.io/ @foody/reviewable-md
-npm run dev                    # opens the default page at http://localhost:27175
+npm run dev                    # opens the default page at http://localhost:28175
 npm run dev -- sample.md       # opens sample.md and persists its path in the URL
 ```
 
@@ -20,7 +20,7 @@ npm run dev -- sample.md       # opens sample.md and persists its path in the UR
 
 ```bash
 npm install reviewable-md
-npm run dev                    # opens the default page at http://localhost:27175
+npm run dev                    # opens the default page at http://localhost:28175
 npm run dev -- sample.md       # opens sample.md and persists its path in the URL
 ```
 
