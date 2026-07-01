@@ -16,6 +16,49 @@ export function daemonStatePath(home = os.homedir()) {
   return path.join(daemonDir(home), 'daemon.json')
 }
 
+export function daemonLockPath(home = os.homedir()) {
+  return path.join(daemonDir(home), 'daemon.lock')
+}
+
+const LOCK_STALE_MS = 10000
+const LOCK_RETRY_MS = 50
+
+// Concurrent `open` invocations (e.g. two skill calls back to back) must not
+// each decide independently that no daemon exists and spawn their own. This
+// is a cross-process mutex around the read-health/spawn/write-state section:
+// an exclusive-create lockfile, with staleness detection so a crashed holder
+// doesn't wedge every future invocation forever.
+async function withDaemonLock(home, timeoutMs, fn) {
+  await fsp.mkdir(daemonDir(home), { recursive: true })
+  const lockPath = daemonLockPath(home)
+  const start = Date.now()
+
+  for (;;) {
+    try {
+      const handle = await fsp.open(lockPath, 'wx')
+      await handle.close()
+      break
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err
+      const stat = await fsp.stat(lockPath).catch(() => null)
+      if (stat && Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+        await fsp.rm(lockPath, { force: true })
+        continue
+      }
+      if (Date.now() - start > timeoutMs) {
+        throw new Error('Timed out waiting for the Reviewable Markdown daemon lock')
+      }
+      await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS))
+    }
+  }
+
+  try {
+    return await fn()
+  } finally {
+    await fsp.rm(lockPath, { force: true })
+  }
+}
+
 export async function readDaemonState({ home = os.homedir() } = {}) {
   try {
     return JSON.parse(await fsp.readFile(daemonStatePath(home), 'utf8'))
@@ -77,33 +120,35 @@ export async function ensureDaemon({
 } = {}) {
   if (!cliPath) throw new Error('Missing CLI path for daemon startup')
 
-  const existing = await readDaemonState({ home })
-  if (existing?.port && await probeHealth(existing.port, { fetchImpl })) {
-    return { ...existing, reused: true }
-  }
+  return withDaemonLock(home, timeoutMs, async () => {
+    const existing = await readDaemonState({ home })
+    if (existing?.port && await probeHealth(existing.port, { fetchImpl })) {
+      return { ...existing, reused: true }
+    }
 
-  const selectedPort = await findAvailablePort(port)
-  const child = spawnImpl(process.execPath, [
-    cliPath,
-    'serve',
-    '--daemon',
-    '--port',
-    String(selectedPort),
-    '--no-open',
-  ], {
-    detached: true,
-    stdio: 'ignore',
+    const selectedPort = await findAvailablePort(port)
+    const child = spawnImpl(process.execPath, [
+      cliPath,
+      'serve',
+      '--daemon',
+      '--port',
+      String(selectedPort),
+      '--no-open',
+    ], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.unref?.()
+
+    const state = {
+      pid: child.pid,
+      port: selectedPort,
+      startedAt: new Date().toISOString(),
+    }
+    await writeDaemonState(state, { home })
+    await waitForHealth(selectedPort, { timeoutMs, fetchImpl })
+    return { ...state, reused: false }
   })
-  child.unref?.()
-
-  const state = {
-    pid: child.pid,
-    port: selectedPort,
-    startedAt: new Date().toISOString(),
-  }
-  await writeDaemonState(state, { home })
-  await waitForHealth(selectedPort, { timeoutMs, fetchImpl })
-  return { ...state, reused: false }
 }
 
 export function openUrl(link, { spawnImpl = spawn } = {}) {

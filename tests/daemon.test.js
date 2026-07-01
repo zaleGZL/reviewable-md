@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {
+  daemonLockPath,
   ensureDaemon,
   openMarkdownFile,
   readDaemonState,
@@ -91,5 +92,53 @@ describe('daemon helpers', () => {
 
     expect(result.file).toBe(mdPath)
     expect(result.url).toContain(encodeURIComponent(mdPath))
+  })
+
+  it('spawns only one daemon when ensureDaemon is called concurrently', async () => {
+    let spawnCount = 0
+    const spawnImpl = () => {
+      spawnCount += 1
+      return { pid: 1000 + spawnCount, unref() {} }
+    }
+    let healthy = false
+    const fetchImpl = async () => {
+      if (!healthy) throw new Error('not up yet')
+      return { ok: true, json: async () => ({ ok: true, name: 'reviewable-md' }) }
+    }
+
+    const pending = Promise.all([1, 2, 3].map(() => ensureDaemon({
+      home: dir,
+      cliPath: '/tmp/reviewable-md.js',
+      spawnImpl,
+      fetchImpl,
+      timeoutMs: 2000,
+    })))
+    setTimeout(() => { healthy = true }, 50)
+    const results = await pending
+
+    expect(spawnCount).toBe(1)
+    const ports = new Set(results.map((r) => r.port))
+    expect(ports.size).toBe(1)
+    expect(results.filter((r) => r.reused).length).toBe(2)
+  })
+
+  it('removes a stale lock file left behind by a crashed process', async () => {
+    const lockPath = daemonLockPath(dir)
+    await fsp.mkdir(path.dirname(lockPath), { recursive: true })
+    await fsp.writeFile(lockPath, '')
+    const staleTime = new Date(Date.now() - 60_000)
+    await fsp.utimes(lockPath, staleTime, staleTime)
+
+    const result = await ensureDaemon({
+      home: dir,
+      cliPath: '/tmp/reviewable-md.js',
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({ ok: true, name: 'reviewable-md' }),
+      }),
+      spawnImpl: () => ({ pid: 42, unref() {} }),
+    })
+
+    expect(result).toMatchObject({ pid: 42, reused: false })
   })
 })
